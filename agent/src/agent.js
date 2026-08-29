@@ -85,6 +85,17 @@ export class CommerceAgent {
     this.executeTool = createToolExecutor({ catalog });
   }
 
+  /** executeTool, but a thrown error becomes a tool error the model can recover
+   *  from instead of aborting the whole model loop to the offline planner. */
+  async runTool(name, params, session) {
+    try {
+      return await this.executeTool(name, params, session);
+    } catch (err) {
+      console.warn(`[agent] tool ${name} threw (${err.message}) - returned as a tool error`);
+      return { ok: false, error: { code: "tool_failed", message: err.message } };
+    }
+  }
+
   async loadSession(request) {
     const raw = await this.store.get(sessionKey(request.session_id));
     if (raw) {
@@ -260,7 +271,10 @@ export class CommerceAgent {
       });
       if (!r.ok) return { messages: [textMessage(r.error.message)], activity };
       return {
-        messages: [{ type: "comparison", products: r.products, rows: r.rows }],
+        messages: [
+          { type: "comparison", products: r.products, rows: r.rows },
+          textMessage(compareVerdict(r.products, session.profile)),
+        ],
         activity,
       };
     }
@@ -379,7 +393,7 @@ export class CommerceAgent {
       messages.push({ role: "assistant", content });
       const results = [];
       for (const call of calls) {
-        const result = await this.executeTool(call.name, call.input ?? {}, session);
+        const result = await this.runTool(call.name, call.input ?? {}, session);
         if (result.ok && result.activity) activity.push(result.activity);
         output.push(...messagesForTool(call.name, result, session));
         results.push({ type: "tool_result", tool_use_id: call.id, content: JSON.stringify(result) });
@@ -442,7 +456,7 @@ export class CommerceAgent {
         } catch {
           args = {};
         }
-        const result = await this.executeTool(call.function?.name, args, session);
+        const result = await this.runTool(call.function?.name, args, session);
         if (result.ok && result.activity) activity.push(result.activity);
         output.push(...messagesForTool(call.function?.name, result, session));
         messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
@@ -450,6 +464,62 @@ export class CommerceAgent {
     }
     throw new Error("tool loop exceeded its safety limit");
   }
+}
+
+/**
+ * A deterministic "what's different + which one" verdict for the offline planner
+ * (the model writes its own when a key is present). Covers price and the
+ * footwear specs that matter, then picks against the shopper's profile.
+ */
+function compareVerdict(products, profile = {}) {
+  const dollars = (n) => `$${Number(n).toFixed(2)}`;
+  const attr = (p, k) => String(p.attributes?.[k] ?? "").toLowerCase().trim();
+  const numAttr = (p, k) => Number(p.attributes?.[k]);
+  const isWaterproof = (p) => ["yes", "true", "waterproof", "1"].includes(attr(p, "waterproof"));
+  const cushionRank = { minimal: 0, balanced: 1, high: 2, max: 3 };
+  const a = products[0];
+  const b = products[1];
+  const diffs = [];
+
+  if (a.price !== b.price) {
+    const cheap = a.price < b.price ? a : b;
+    const dear = cheap === a ? b : a;
+    diffs.push(`the ${cheap.name} is ${dollars(dear.price - cheap.price)} cheaper`);
+  }
+  if (attr(a, "activity") && attr(b, "activity") && attr(a, "activity") !== attr(b, "activity"))
+    diffs.push(`the ${a.name} is built for ${attr(a, "activity")}, the ${b.name} for ${attr(b, "activity")}`);
+  if (attr(a, "cushioning") && attr(b, "cushioning") && attr(a, "cushioning") !== attr(b, "cushioning")) {
+    const soft = (cushionRank[attr(a, "cushioning")] ?? 0) >= (cushionRank[attr(b, "cushioning")] ?? 0) ? a : b;
+    diffs.push(`the ${soft.name} has more cushioning`);
+  }
+  if (Number.isFinite(numAttr(a, "weight_g")) && Number.isFinite(numAttr(b, "weight_g")) && numAttr(a, "weight_g") !== numAttr(b, "weight_g")) {
+    const lighter = numAttr(a, "weight_g") < numAttr(b, "weight_g") ? a : b;
+    diffs.push(`the ${lighter.name} is lighter (${numAttr(lighter, "weight_g")} g)`);
+  }
+  if (isWaterproof(a) !== isWaterproof(b))
+    diffs.push(`only the ${(isWaterproof(a) ? a : b).name} is waterproof`);
+
+  const terms = [
+    ...(profile.priorities ?? []),
+    ...(profile.required_features ?? []),
+    profile.primary_use,
+  ].filter(Boolean).map((t) => String(t).toLowerCase());
+  const score = (p) => {
+    const hay = `${p.name} ${p.description} ${Object.values(p.attributes ?? {}).flat().join(" ")}`.toLowerCase();
+    let s = terms.reduce((n, t) => n + (t.split(/\s+/).every((w) => hay.includes(w)) ? 1 : 0), 0);
+    if (profile.budget_max && p.price <= profile.budget_max) s += 0.5;
+    return s;
+  };
+  const ranked = [...products].sort((x, y) => score(y) - score(x) || x.price - y.price);
+  const pick = ranked[0];
+  const why = terms.length && score(pick) > 0
+    ? `it lines up best with what you said matters (${(profile.priorities ?? profile.required_features ?? []).slice(0, 2).join(", ") || profile.primary_use})`
+    : profile.budget_max
+      ? `it does the job and stays under your ${dollars(profile.budget_max)} budget`
+      : `it's the better value of the two`;
+
+  const head = diffs.length ? `${diffs.slice(0, 3).join("; ")}.` : "They're closely matched on the key specs.";
+  return `${head[0].toUpperCase()}${head.slice(1)} For you I'd go with the ${pick.name} — ${why}.`;
 }
 
 /** Loose name/id match of catalogue products mentioned in free text (offline compare). */

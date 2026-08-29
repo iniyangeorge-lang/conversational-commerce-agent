@@ -34,6 +34,11 @@ otherwise it's auto-detected. With **no** key the server uses a deterministic
 offline planner (used by demos and the unit tests). Set `AGENT_URL` and run
 `npm run convo -w @cca/agent` for the scripted search → add → checkout-preview flow.
 
+A tool that throws (e.g. the catalogue is briefly unreachable) is turned into a
+tool error the model can recover from mid-conversation - it no longer aborts the
+whole model loop to the offline planner. `getMerchant` returns `null` (not a
+throw) for an unknown merchant, so a fumbled id surfaces as a normal tool error.
+
 ## HTTP API
 
 `POST /chat` accepts the shared `ChatRequest` shape (`merchant_id` is optional -
@@ -115,10 +120,10 @@ clarifying question with tappable options), `cart`, `transaction_preview`.
 |---|---|
 | `save_shopper_profile` | Merge changed preference fields into the session profile (or drop fields via `clear: [...]`). Called as soon as the shopper reveals or retracts a preference. |
 | `ask_clarifying_question` | One progressive question + 2-6 tappable options. Renders as a `choices` message. |
-| `search_products` | Marketplace catalogue search (`POST /search`, all merchants). Results carry `merchant_id` + `merchant_name`; out-of-stock dropped. |
+| `search_products` | Marketplace catalogue search (`POST /search`, all merchants). Free-text `query` + `max_price` + footwear `filters` (size, color, brand, activity, waterproof, cushioning, width, closure, support, drop_mm/weight_g ranges, exclude). The executor whitelists the filter keys (drops a model-invented `category`), defaults `max_price` from the profile, and attaches `rank_hints` (priorities / required_features / primary_use / budget) so the profile re-ranks results. Out-of-stock dropped. |
 | `get_product` | Full detail for one product. |
 | `recommend_products` | An explained shortlist (1-4). Model supplies match_score / reasons / tradeoffs; **the app re-validates each product and substitutes the catalogue's price.** Renders as a `recommendation` message. |
-| `compare_products` | 2-4 products → a `comparison` table (rows derived from real product fields). |
+| `compare_products` | 2-4 products → a `comparison` table (rows from real product fields) **followed by a required text verdict** (key differences + which one for this shopper). If the model garbles the ids or passes a name / position, they're recovered from the last list shown; failing that it falls back to comparing the last search/recommendation. |
 | `add_to_cart` | `merchant_id` + `product_id` + `quantity` (+ `size`/`color`). Size required for apparel; lines keyed by merchant + product + size + colour. |
 | `update_cart_item` | Change a line's quantity, or remove it with `quantity: 0`. |
 | `get_cart_summary` | The cart, grouped by merchant, + running subtotal. |

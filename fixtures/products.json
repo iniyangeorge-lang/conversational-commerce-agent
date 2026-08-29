@@ -1,218 +1,564 @@
 [
   {
-    "product_id": "prod_001",
     "merchant_id": "merchant_123",
     "name": "Classic Canvas Low-Top",
     "description": "Cotton canvas upper, vulcanized rubber sole, and a slim low-profile silhouette.",
-    "price": 55.0,
+    "brand": "Heritage",
+    "price": 55,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_001/400/300",
-    "attributes": { "size": ["7", "8", "9", "10", "11", "12"], "color": ["white", "black", "navy"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "white",
+        "black",
+        "navy"
+      ],
+      "activity": "casual",
+      "cushioning": "minimal",
+      "width": "regular",
+      "closure": "lace"
+    },
+    "availability": true,
+    "product_id": "prod_001"
   },
   {
-    "product_id": "prod_002",
     "merchant_id": "merchant_123",
     "name": "Everyday Leather Sneaker",
     "description": "Full-grain leather upper with a cushioned foam midsole for all-day wear.",
-    "price": 95.0,
+    "brand": "Heritage",
+    "price": 95,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_002/400/300",
-    "attributes": { "size": ["7", "8", "9", "10", "11", "12"], "color": ["white", "tan", "black"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "white",
+        "tan",
+        "black"
+      ],
+      "activity": "casual",
+      "cushioning": "balanced",
+      "width": "regular",
+      "closure": "lace"
+    },
+    "availability": true,
+    "product_id": "prod_002"
   },
   {
-    "product_id": "prod_003",
     "merchant_id": "merchant_123",
     "name": "Trail Running Shoe",
     "description": "Aggressive lugged outsole and a rock plate for technical, uneven terrain.",
-    "price": 128.0,
+    "brand": "Cadence",
+    "price": 128,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_003/400/300",
-    "attributes": { "size": ["8", "9", "10", "11", "12"], "color": ["forest green", "charcoal", "clay"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "forest green",
+        "charcoal",
+        "clay"
+      ],
+      "activity": "trail",
+      "cushioning": "balanced",
+      "width": "regular",
+      "closure": "lace",
+      "support": "neutral",
+      "drop_mm": "8",
+      "weight_g": "310"
+    },
+    "availability": true,
+    "product_id": "prod_003"
   },
   {
-    "product_id": "prod_004",
     "merchant_id": "merchant_123",
     "name": "Road Running Shoe",
     "description": "Lightweight engineered mesh and a responsive EVA foam midsole for daily miles.",
-    "price": 138.0,
+    "brand": "Cadence",
+    "price": 138,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_004/400/300",
-    "attributes": { "size": ["7", "8", "9", "10", "11", "12"], "color": ["blue", "black", "volt"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "blue",
+        "black",
+        "volt"
+      ],
+      "activity": "road",
+      "cushioning": "high",
+      "width": "regular",
+      "closure": "lace",
+      "support": "neutral",
+      "drop_mm": "10",
+      "weight_g": "258"
+    },
+    "availability": true,
+    "product_id": "prod_004"
   },
   {
-    "product_id": "prod_005",
     "merchant_id": "merchant_123",
     "name": "Marathon Racing Flat",
     "description": "Carbon-plated race-day shoe at 6.4 oz with a propulsive rocker geometry.",
-    "price": 155.0,
+    "brand": "Cadence",
+    "price": 155,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_005/400/300",
-    "attributes": { "size": ["8", "9", "10", "11"], "color": ["orange", "white"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "8",
+        "9",
+        "10",
+        "11"
+      ],
+      "color": [
+        "orange",
+        "white"
+      ],
+      "activity": "road",
+      "cushioning": "balanced",
+      "width": "regular",
+      "closure": "lace",
+      "support": "neutral",
+      "drop_mm": "8",
+      "weight_g": "181"
+    },
+    "availability": true,
+    "product_id": "prod_005"
   },
   {
-    "product_id": "prod_006",
     "merchant_id": "merchant_123",
     "name": "Suede Chukka Boot",
     "description": "Two-eyelet suede chukka on a natural crepe sole.",
-    "price": 120.0,
+    "brand": "Heritage",
+    "price": 120,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_006/400/300",
-    "attributes": { "size": ["7", "8", "9", "10", "11", "12"], "color": ["sand", "dark brown", "grey"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "sand",
+        "dark brown",
+        "grey"
+      ],
+      "activity": "casual",
+      "cushioning": "minimal",
+      "width": "regular",
+      "closure": "lace"
+    },
+    "availability": true,
+    "product_id": "prod_006"
   },
   {
-    "product_id": "prod_007",
     "merchant_id": "merchant_123",
     "name": "Waterproof Hiking Boot",
     "description": "Seam-sealed waterproof membrane, protective toe cap, and a grippy multi-terrain outsole.",
-    "price": 159.0,
+    "brand": "Voyager",
+    "price": 159,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_007/400/300",
-    "attributes": { "size": ["8", "9", "10", "11", "12"], "color": ["brown", "black"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "brown",
+        "black"
+      ],
+      "activity": "trail",
+      "waterproof": "yes",
+      "cushioning": "balanced",
+      "width": "regular",
+      "closure": "lace",
+      "support": "stability",
+      "weight_g": "520"
+    },
+    "availability": true,
+    "product_id": "prod_007"
   },
   {
-    "product_id": "prod_008",
     "merchant_id": "merchant_123",
     "name": "Chelsea Boot",
     "description": "Elastic-gore leather Chelsea boot with a stacked leather heel.",
-    "price": 135.0,
+    "brand": "Heritage",
+    "price": 135,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_008/400/300",
-    "attributes": { "size": ["7", "8", "9", "10", "11", "12"], "color": ["black", "chestnut"] },
-    "availability": false
+    "attributes": {
+      "size": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "black",
+        "chestnut"
+      ],
+      "activity": "casual",
+      "cushioning": "minimal",
+      "width": "regular",
+      "closure": "slip-on"
+    },
+    "availability": false,
+    "product_id": "prod_008"
   },
   {
-    "product_id": "prod_009",
     "merchant_id": "merchant_123",
     "name": "Penny Loafer",
     "description": "Hand-stitched moc-toe penny loafer in polished calf leather.",
-    "price": 110.0,
+    "brand": "Heritage",
+    "price": 110,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_009/400/300",
-    "attributes": { "size": ["7", "8", "9", "10", "11", "12"], "color": ["burgundy", "black", "brown"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "burgundy",
+        "black",
+        "brown"
+      ],
+      "activity": "casual",
+      "cushioning": "minimal",
+      "width": "regular",
+      "closure": "slip-on"
+    },
+    "availability": true,
+    "product_id": "prod_009"
   },
   {
-    "product_id": "prod_010",
     "merchant_id": "merchant_123",
     "name": "Driving Moccasin",
     "description": "Soft deerskin upper with a rubber-nub sole for grip behind the wheel.",
-    "price": 98.0,
+    "brand": "Heritage",
+    "price": 98,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_010/400/300",
-    "attributes": { "size": ["7", "8", "9", "10", "11", "12"], "color": ["navy", "tan", "grey"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "navy",
+        "tan",
+        "grey"
+      ],
+      "activity": "casual",
+      "cushioning": "minimal",
+      "width": "regular",
+      "closure": "slip-on"
+    },
+    "availability": true,
+    "product_id": "prod_010"
   },
   {
-    "product_id": "prod_011",
     "merchant_id": "merchant_123",
     "name": "Cap-Toe Oxford",
     "description": "Closed-lacing cap-toe oxford with a Goodyear-welted leather sole.",
-    "price": 145.0,
+    "brand": "Heritage",
+    "price": 145,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_011/400/300",
-    "attributes": { "size": ["7", "8", "9", "10", "11", "12"], "color": ["black", "oxblood"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "black",
+        "oxblood"
+      ],
+      "activity": "casual",
+      "cushioning": "minimal",
+      "width": "regular",
+      "closure": "lace"
+    },
+    "availability": true,
+    "product_id": "prod_011"
   },
   {
-    "product_id": "prod_012",
     "merchant_id": "merchant_123",
     "name": "Double Monk Strap",
     "description": "Two-buckle monk strap in burnished calfskin.",
-    "price": 150.0,
+    "brand": "Heritage",
+    "price": 150,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_012/400/300",
-    "attributes": { "size": ["7", "8", "9", "10", "11", "12"], "color": ["dark brown", "black"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "dark brown",
+        "black"
+      ],
+      "activity": "casual",
+      "cushioning": "minimal",
+      "width": "regular"
+    },
+    "availability": true,
+    "product_id": "prod_012"
   },
   {
-    "product_id": "prod_013",
     "merchant_id": "merchant_123",
     "name": "Leather Footbed Sandal",
     "description": "Adjustable triple-strap sandal on a contoured vegetable-tanned leather footbed.",
-    "price": 65.0,
+    "brand": "Heritage",
+    "price": 65,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_013/400/300",
-    "attributes": { "size": ["6", "7", "8", "9", "10", "11"], "color": ["tan", "black", "white"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11"
+      ],
+      "color": [
+        "tan",
+        "black",
+        "white"
+      ],
+      "activity": "casual",
+      "cushioning": "minimal",
+      "width": "regular",
+      "closure": "velcro"
+    },
+    "availability": true,
+    "product_id": "prod_013"
   },
   {
-    "product_id": "prod_014",
     "merchant_id": "merchant_123",
     "name": "Sport Slide",
     "description": "Contoured EVA slide with a quick-dry footbed.",
-    "price": 35.0,
+    "brand": "Cadence",
+    "price": 35,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_014/400/300",
-    "attributes": { "size": ["7", "8", "9", "10", "11", "12"], "color": ["black", "blue", "red"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "black",
+        "blue",
+        "red"
+      ],
+      "activity": "walking",
+      "cushioning": "minimal",
+      "width": "regular",
+      "closure": "slip-on"
+    },
+    "availability": true,
+    "product_id": "prod_014"
   },
   {
-    "product_id": "prod_015",
     "merchant_id": "merchant_123",
     "name": "Block Heel Ankle Boot",
     "description": "50mm block-heel ankle boot with an inside zip and almond toe.",
-    "price": 125.0,
+    "brand": "Heritage",
+    "price": 125,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_015/400/300",
-    "attributes": { "size": ["5", "6", "7", "8", "9", "10"], "color": ["black", "taupe", "cognac"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10"
+      ],
+      "color": [
+        "black",
+        "taupe",
+        "cognac"
+      ],
+      "activity": "casual",
+      "cushioning": "minimal",
+      "width": "narrow",
+      "closure": "slip-on"
+    },
+    "availability": true,
+    "product_id": "prod_015"
   },
   {
-    "product_id": "prod_016",
     "merchant_id": "merchant_123",
     "name": "Almond-Toe Ballet Flat",
     "description": "Ballet flat with a padded collar and a flexible split sole.",
-    "price": 72.0,
+    "brand": "Heritage",
+    "price": 72,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_016/400/300",
-    "attributes": { "size": ["5", "6", "7", "8", "9", "10"], "color": ["blush", "black", "leopard"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10"
+      ],
+      "color": [
+        "blush",
+        "black",
+        "leopard"
+      ],
+      "activity": "casual",
+      "cushioning": "minimal",
+      "width": "narrow",
+      "closure": "slip-on"
+    },
+    "availability": true,
+    "product_id": "prod_016"
   },
   {
-    "product_id": "prod_017",
     "merchant_id": "merchant_123",
     "name": "Merino Wool Slip-On",
     "description": "Machine-washable merino wool upper slip-on with a lightweight foam sole.",
-    "price": 85.0,
+    "brand": "Cadence",
+    "price": 85,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_017/400/300",
-    "attributes": { "size": ["6", "7", "8", "9", "10", "11", "12"], "color": ["heather grey", "navy", "natural"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "heather grey",
+        "navy",
+        "natural"
+      ],
+      "activity": "walking",
+      "cushioning": "balanced",
+      "width": "regular",
+      "closure": "slip-on",
+      "weight_g": "210"
+    },
+    "availability": true,
+    "product_id": "prod_017"
   },
   {
-    "product_id": "prod_018",
     "merchant_id": "merchant_123",
     "name": "Insulated Winter Boot",
-    "description": "Fleece-lined, weatherproof winter boot rated to -25 degrees Fahrenheit.",
-    "price": 148.0,
+    "description": "Fleece-lined weatherproof winter boot rated to -25 degrees Fahrenheit.",
+    "brand": "Voyager",
+    "price": 148,
     "currency": "USD",
     "category": "fashion",
     "image_url": "https://picsum.photos/seed/prod_018/400/300",
-    "attributes": { "size": ["8", "9", "10", "11", "12"], "color": ["black", "brown"] },
-    "availability": true
+    "attributes": {
+      "size": [
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "color": [
+        "black",
+        "brown"
+      ],
+      "activity": "walking",
+      "waterproof": "yes",
+      "cushioning": "balanced",
+      "width": "wide",
+      "closure": "lace",
+      "weight_g": "640"
+    },
+    "availability": true,
+    "product_id": "prod_018"
   }
 ]

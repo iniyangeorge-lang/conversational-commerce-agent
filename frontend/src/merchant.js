@@ -112,6 +112,8 @@
     $("#store-name").textContent = merchant.name;
     $("#store-avatar").textContent = initials(merchant.name);
     document.title = `${merchant.name} — Merchant dashboard`;
+    paintToggle();
+    $("#paste-hint").textContent = "The catalog service structures it with an LLM (falls back to a clear error if no key is set).";
     loadProducts();
     loadOrders();
   }
@@ -131,7 +133,7 @@
             const color = (p.attributes?.color || []).join(", ");
             const opts = [size && `sizes ${size}`, color].filter(Boolean).join(" · ");
             return `<tr>
-              <td><b>${esc(p.name)}</b><br><small>${esc(p.product_id)}</small></td>
+              <td><b>${esc(p.name)}</b>${p.brand ? ` <small>· ${esc(p.brand)}</small>` : ""}<br><small>${esc(p.product_id)}</small></td>
               <td>${money(p.price, p.currency)}</td>
               <td>${esc(p.category)}</td>
               <td class="muted">${esc(opts) || "—"}</td>
@@ -185,19 +187,29 @@
 
   $("#reload-ready").onclick = () => renderReadiness(lastProducts);
 
-  // --- Connect-an-API demo (mock) -------------------------------------
+  // --- "Go live" toggle ---------------------------------------------------
 
-  $("#api-test").onclick = () => {
-    const note = $("#api-note");
-    const url = $("#api-url").value.trim();
-    const keyOk = $("#api-key").value.trim().length >= 4;
-    let valid = false;
-    try { valid = ["http:", "https:"].includes(new URL(url).protocol); } catch { valid = false; }
-    if (!valid) { note.className = "note err"; note.textContent = "Enter a valid https:// endpoint."; return; }
-    if (!keyOk) { note.className = "note err"; note.textContent = "Enter your API key (demo — anything 4+ chars)."; return; }
-    note.className = "note";
-    note.textContent = `✓ Connection successful — ${lastProducts.length} product${lastProducts.length === 1 ? "" : "s"} detected. (Demo: your CSV catalog is used; no real request was made.)`;
-    toast("Connection successful");
+  const aiToggle = $("#ai-toggle");
+  function paintToggle() {
+    const on = merchant?.ai_enabled !== false;
+    aiToggle.checked = on;
+    $("#ai-label").textContent = on ? "Live" : "Paused";
+  }
+  aiToggle.onchange = async () => {
+    const enabled = aiToggle.checked;
+    try {
+      const { merchant: updated } = await req(`${CATALOG}/merchants/${mid()}/ai-shopping`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      merchant = updated;
+      paintToggle();
+      toast(enabled ? "Your store is live for AI shopping" : "Paused — shoppers can't find your products");
+    } catch (err) {
+      aiToggle.checked = !enabled;
+      toast(err.message, "err");
+    }
   };
 
   async function loadOrders() {
@@ -224,38 +236,146 @@
     }
   }
 
-  async function importCsv(file) {
-    const note = $("#import-note");
-    note.className = "note";
-    note.textContent = `Importing ${file.name}…`;
+  // --- catalog import: CSV / paste / feed -----------------------------
+
+  const CANONICAL = ["product_id", "name", "description", "brand", "price", "currency", "category", "image_url", "size", "color", "availability"];
+  const jsonPost = (path, body) =>
+    req(`${CATALOG}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const note = (msg, err) => { const n = $("#import-note"); n.className = err ? "note err" : "note"; n.textContent = msg; };
+  const clearPreview = () => { const p = $("#preview"); p.hidden = true; p.innerHTML = ""; };
+
+  // tabs
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.onclick = () => {
+      document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("is-on", t === tab));
+      document.querySelectorAll(".tabpane").forEach((p) => (p.hidden = p.id !== `pane-${tab.dataset.tab}`));
+      clearPreview();
+      $("#import-note").textContent = "";
+    };
+  });
+
+  // --- CSV: upload -> preview + column map -> import ---
+  let pendingCsv = null; // { text, overrides }
+
+  async function previewCsv(text) {
+    pendingCsv = { text, overrides: {} };
+    note("Reading your file…");
+    await renderPreview();
+  }
+
+  async function renderPreview() {
+    let pv;
     try {
-      const body = await req(`${CATALOG}/merchants/${mid()}/products/csv`, {
-        method: "POST",
-        headers: { "content-type": "text/csv" },
-        body: await file.text(),
-      });
-      const skipped = body.errors?.length ? `, ${body.errors.length} row(s) skipped` : "";
-      note.className = "note";
-      note.textContent = `Imported: ${body.inserted} new, ${body.updated} updated${skipped}.`;
-      toast(`Imported ${body.inserted + body.updated} product${body.inserted + body.updated === 1 ? "" : "s"}`);
-      loadProducts();
-    } catch (err) {
-      note.className = "note err";
-      note.textContent = `Import failed: ${err.message}`;
-      toast("Import failed", "err");
-    }
+      pv = await jsonPost(`/merchants/${mid()}/products/preview`, { csv: pendingCsv.text, overrides: pendingCsv.overrides });
+    } catch (err) { note(`Couldn't read the file: ${err.message}`, true); return; }
+    $("#import-note").textContent = "";
+
+    const opts = [...CANONICAL, "attribute", "ignore"];
+    const rows = pv.mapping.map((m) => {
+      const sel = m.kind === "ignored" ? "ignore" : m.kind === "attribute" ? "attribute" : m.target;
+      const options = opts.map((o) => `<option value="${o}"${o === sel ? " selected" : ""}>${o === "attribute" ? "→ attribute" : o === "ignore" ? "— ignore" : o}</option>`).join("");
+      return `<tr><td>${esc(m.source)}</td><td><select data-src="${esc(m.source)}">${options}</select></td></tr>`;
+    }).join("");
+
+    const missingReq = ["name", "price"].filter((f) => !pv.mapping.some((m) => m.target === f));
+    const warn = missingReq.length
+      ? `<span class="pill warn">no column mapped to ${missingReq.join(" & ")}</span>`
+      : `<span class="pill ok">${pv.ready} ready</span>` + (pv.skipped ? ` <span class="pill warn">${pv.skipped} will be skipped</span>` : "");
+
+    const sample = pv.sample.slice(0, 3)
+      .map((p) => `<li><b>${esc(p.name || "—")}</b> · ${money(p.price)} ${p.brand ? "· " + esc(p.brand) : ""} ${(p.attributes?.size || []).length ? "· sizes " + esc((p.attributes.size).join("/")) : ""}</li>`)
+      .join("");
+
+    $("#preview").hidden = false;
+    $("#preview").innerHTML = `
+      <h4>Column mapping — ${pv.total} rows</h4>
+      <table class="map-table"><tbody>${rows}</tbody></table>
+      <div>${warn}</div>
+      ${sample ? `<h4 style="margin-top:12px">Preview</h4><ul class="preview-list">${sample}</ul>` : ""}
+      <div class="acts">
+        <button id="pv-import"${missingReq.length ? " disabled" : ""}>Import ${pv.ready} product${pv.ready === 1 ? "" : "s"}</button>
+        <button class="ghost" id="pv-cancel">Cancel</button>
+      </div>`;
+
+    $("#preview").querySelectorAll("select").forEach((s) => {
+      s.onchange = () => {
+        const v = s.value;
+        pendingCsv.overrides[s.dataset.src] = v === "attribute" ? "attribute" : v === "ignore" ? "ignore" : v;
+        renderPreview();
+      };
+    });
+    $("#pv-cancel").onclick = () => { pendingCsv = null; clearPreview(); };
+    $("#pv-import").onclick = async () => {
+      $("#pv-import").disabled = true;
+      try {
+        const b = await jsonPost(`/merchants/${mid()}/products/csv`, { csv: pendingCsv.text, overrides: pendingCsv.overrides });
+        const n = b.inserted + b.updated;
+        toast(`Imported ${n} product${n === 1 ? "" : "s"}${b.errors?.length ? `, ${b.errors.length} skipped` : ""}`);
+        note(`Imported ${b.inserted} new, ${b.updated} updated${b.errors?.length ? `. Skipped ${b.errors.length}: ${b.errors.slice(0, 3).map((e) => `row ${e.row}`).join(", ")}` : "."}`);
+        pendingCsv = null; clearPreview(); loadProducts();
+      } catch (err) { note(`Import failed: ${err.message}`, true); toast("Import failed", "err"); }
+    };
   }
 
   const drop = $("#drop");
+  const takeFile = (f) => f && f.text().then(previewCsv);
   $("#choose").onclick = () => $("#file").click();
-  $("#file").onchange = (e) => e.target.files[0] && importCsv(e.target.files[0]);
-  ["dragenter", "dragover"].forEach((ev) =>
-    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }),
-  );
-  ["dragleave", "drop"].forEach((ev) =>
-    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }),
-  );
-  drop.addEventListener("drop", (e) => e.dataTransfer.files[0] && importCsv(e.dataTransfer.files[0]));
+  $("#file").onchange = (e) => takeFile(e.target.files[0]);
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => takeFile(e.dataTransfer.files[0]));
+
+  // --- Paste a list -> AI extract -> review -> save ---
+  $("#paste-extract").onclick = async () => {
+    const text = $("#paste-text").value.trim();
+    if (!text) { note("Paste your product list first.", true); return; }
+    const btn = $("#paste-extract");
+    btn.disabled = true; note("Extracting products…");
+    try {
+      const { products, errors } = await jsonPost(`/merchants/${mid()}/products/extract`, { text });
+      $("#import-note").textContent = "";
+      if (!products.length) { note("Nothing recognisable to extract — try adding prices.", true); return; }
+      const list = products.map((p, i) =>
+        `<li><b>${esc(p.name)}</b> · ${money(p.price)}${p.brand ? " · " + esc(p.brand) : ""} — ${esc((p.description || "").slice(0, 80))}</li>`).join("");
+      $("#preview").hidden = false;
+      $("#preview").innerHTML = `
+        <h4>${products.length} product${products.length === 1 ? "" : "s"} extracted${errors?.length ? ` (${errors.length} skipped)` : ""}</h4>
+        <ul class="preview-list">${list}</ul>
+        <div class="acts">
+          <button id="pv-save">Save ${products.length} to catalog</button>
+          <button class="ghost" id="pv-cancel">Cancel</button>
+        </div>`;
+      $("#pv-cancel").onclick = clearPreview;
+      $("#pv-save").onclick = async () => {
+        $("#pv-save").disabled = true;
+        try {
+          const b = await jsonPost(`/merchants/${mid()}/products`, { products });
+          toast(`Saved ${b.inserted + b.updated} product${b.inserted + b.updated === 1 ? "" : "s"}`);
+          clearPreview(); $("#paste-text").value = ""; loadProducts();
+        } catch (err) { note(`Save failed: ${err.message}`, true); }
+      };
+    } catch (err) {
+      note(`Extraction failed: ${err.message}`, true);
+    } finally { btn.disabled = false; }
+  };
+
+  // --- Connect a feed ---
+  $("#feed-import").onclick = async () => {
+    const url = $("#feed-url").value.trim();
+    if (!url) { note("Enter a feed URL.", true); return; }
+    const btn = $("#feed-import");
+    btn.disabled = true; note("Fetching your feed…");
+    try {
+      const b = await jsonPost(`/merchants/${mid()}/products/import-feed`, { url });
+      const n = b.inserted + b.updated;
+      toast(`Imported ${n} product${n === 1 ? "" : "s"} from your ${b.format?.toUpperCase() || ""} feed`);
+      note(`Fetched ${b.fetched} rows → ${b.inserted} new, ${b.updated} updated${b.errors?.length ? `, ${b.errors.length} skipped` : ""}.`);
+      loadProducts();
+    } catch (err) {
+      note(`Feed import failed: ${err.message}`, true); toast("Feed import failed", "err");
+    } finally { btn.disabled = false; }
+  };
+
   $("#reload-cat").onclick = loadProducts;
   $("#reload-ord").onclick = loadOrders;
 

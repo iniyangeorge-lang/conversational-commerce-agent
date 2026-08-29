@@ -51,7 +51,10 @@ function hashEmbed(text) {
 }
 
 const hashProvider = {
-  id: "hash-v1",
+  // Bump only when `hashEmbed` itself changes. Changes to *what* we embed
+  // (fields, weights) are tracked by DOC_VERSION in embeddings.js instead, so a
+  // doc-composition change rebuilds vectors for every provider, not just hash.
+  id: "hash-v2",
   async embed(texts) {
     return texts.map(hashEmbed);
   },
@@ -78,18 +81,45 @@ function voyageProvider() {
   };
 }
 
+function openaiProvider() {
+  const key = process.env.EMBEDDING_API_KEY ?? process.env.OPENAI_API_KEY;
+  if (!key) throw new Error("EMBEDDING_API_KEY / OPENAI_API_KEY not set");
+  const model = process.env.EMBEDDING_MODEL ?? "text-embedding-3-small";
+  return {
+    id: `openai:${model}`,
+    async embed(texts) {
+      const res = await fetch("https://api.openai.com/v1/embeddings", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+        body: JSON.stringify({ input: texts, model }),
+      });
+      if (!res.ok) throw new Error(`openai ${res.status}: ${await res.text()}`);
+      const json = await res.json();
+      return json.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
+    },
+  };
+}
+
 let cached;
 
-/** Resolve the configured embedding provider (memoized). Falls back to `hash`. */
+/**
+ * Resolve the configured embedding provider (memoized). Falls back to `hash`.
+ *
+ * Selection: EMBEDDING_PROVIDER (`hash` | `voyage` | `openai`) wins; otherwise
+ * `voyage` iff VOYAGE_API_KEY is set, else `hash`. `openai` is opt-in only
+ * (setting OPENAI_API_KEY for the chat model does NOT switch embeddings).
+ */
 export async function getEmbedder() {
   if (cached) return cached;
-  const choice = process.env.EMBEDDING_PROVIDER ?? (process.env.VOYAGE_API_KEY ? "voyage" : "hash");
-  if (choice === "voyage") {
+  const choice =
+    process.env.EMBEDDING_PROVIDER ?? (process.env.VOYAGE_API_KEY ? "voyage" : "hash");
+  const providers = { voyage: voyageProvider, openai: openaiProvider };
+  if (providers[choice]) {
     try {
-      cached = voyageProvider();
+      cached = providers[choice]();
       return cached;
     } catch (err) {
-      console.warn(`[catalog] voyage embedder unavailable (${err.message}) - using hash`);
+      console.warn(`[catalog] ${choice} embedder unavailable (${err.message}) - using hash`);
     }
   }
   cached = hashProvider;
@@ -99,6 +129,14 @@ export async function getEmbedder() {
 /** For tests: reset the memoized provider. */
 export function resetEmbedder() {
   cached = undefined;
+}
+
+/** L2-normalise a vector to unit length (zero vector -> zeros). */
+export function l2normalize(vec) {
+  let n = 0;
+  for (const x of vec) n += x * x;
+  n = Math.sqrt(n) || 1;
+  return vec.map((x) => x / n);
 }
 
 /** Cosine similarity of two equal-length vectors. */

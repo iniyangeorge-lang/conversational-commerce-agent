@@ -202,7 +202,8 @@ test("GET /categories/:category returns the template", async () => {
   const res = await req("GET", "/categories/fashion");
   assert.equal(res.status, 200);
   const body = await res.json();
-  assert.deepEqual(body.refine_attributes, ["size", "color"]);
+  assert.ok(body.refine_attributes.includes("size") && body.refine_attributes.includes("color"));
+  assert.deepEqual(body.array_attributes, ["size", "color"]);
 
   assert.equal((await req("GET", "/categories/widgets")).status, 404);
 });

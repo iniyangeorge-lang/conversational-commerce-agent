@@ -55,6 +55,9 @@
       .htop{display:flex;align-items:center;justify-content:space-between;gap:10px}
       .htop b{font-size:15px;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
       .dot{width:8px;height:8px;border-radius:50%;background:#4ee6a8;box-shadow:0 0 0 4px rgba(78,230,168,.22)}
+      .hact{display:flex;align-items:center;gap:8px}
+      .hbtn{border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.12);color:#e8e6ff;font:650 11.5px var(--font);padding:5px 10px;border-radius:var(--r-pill);cursor:pointer;transition:background var(--t) var(--ease)}
+      .hbtn:hover{background:rgba(255,255,255,.24)}
       .info{width:24px;height:24px;padding:0;border-radius:50%;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.12);color:#e8e6ff;font:italic 700 13px Georgia,serif;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background var(--t) var(--ease)}
       .info:hover{background:rgba(255,255,255,.24)}
       .panel{background:#101127;color:#c9cbe6;font-size:12.5px;padding:0 16px;max-height:0;overflow:hidden;transition:max-height var(--t) var(--ease),padding var(--t) var(--ease)}
@@ -114,6 +117,14 @@
       button.mini{padding:7px 9px;font-size:12px}
       button.ok{background:var(--c-success)}
       button:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+      button.done,button.done:disabled{opacity:1;background:var(--c-success);background-image:none;cursor:default;box-shadow:none}
+      .paybox{display:flex;gap:8px;margin-top:12px}
+      .paybox input{padding:11px 12px;border:1px solid var(--c-border-strong);border-radius:var(--r-pill);font:inherit;background:var(--c-surface);color:inherit;transition:border-color var(--t) var(--ease)}
+      .paybox input:focus{border-color:var(--c-primary);outline:none;box-shadow:var(--ring)}
+      .paybox input:disabled{opacity:.6}
+      .paybox .num{flex:1;min-width:0}
+      .paybox .cvv{width:76px;text-align:center;letter-spacing:.12em}
+      .card.paid{border-color:var(--c-success)}
       .pact{display:flex;gap:6px;margin-top:auto}
       .pact button{flex:1;padding:8px 4px;font-size:12px}
 
@@ -196,7 +207,10 @@
         <header>
           <div class="htop">
             <b><span class="dot"></span>Shopping assistant</b>
-            <button class="info" id="t-trust" title="What this assistant can and can't do" aria-label="About this assistant">i</button>
+            <span class="hact">
+              <button class="hbtn" id="clear-chat">Clear chat</button>
+              <button class="info" id="t-trust" title="What this assistant can and can't do" aria-label="About this assistant">i</button>
+            </span>
           </div>
         </header>
         <div class="panel" id="p-trust" role="region" aria-label="Assistant capabilities">
@@ -351,7 +365,8 @@
     card.append(media);
 
     const body = el("div", "pbody");
-    if (p.merchant_name) body.append(el("div", "store", p.merchant_name));
+    const meta = [p.brand, p.merchant_name].filter(Boolean).join(" · ");
+    if (meta) body.append(el("div", "store", meta));
     body.append(el("div", "pname", p.name), priceEl(p));
 
     if (match) {
@@ -384,8 +399,12 @@
     }
 
     const act = el("div", "pact");
-    const view = el("button", "sec mini", "Why");
-    view.onclick = () => send(`Tell me more about the ${p.name} and why it fits`);
+    // "Why" only on raw search cards - recommendation cards already show the reasons.
+    let view;
+    if (!match) {
+      view = el("button", "sec mini", "Why");
+      view.onclick = () => send(`Tell me more about the ${p.name} and why it fits`);
+    }
     const cmp = el("button", "sec mini", compareSel.has(ckey(p)) ? "Comparing" : "Compare");
     cmp.setAttribute("aria-pressed", compareSel.has(ckey(p)) ? "true" : "false");
     if (compareSel.has(ckey(p))) cmp.classList.add("sec");
@@ -402,7 +421,7 @@
       });
       setTimeout(() => { add.classList.remove("ok"); add.textContent = "Add"; add.disabled = !!(sizeSel && !sizeSel.value); }, 1100);
     };
-    act.append(view, cmp, add);
+    act.append(...[view, cmp, add].filter(Boolean));
     body.append(act);
     card.append(body);
     return card;
@@ -599,11 +618,21 @@
       const r = el("div", idx === 2 ? "line total" : "line"); r.append(el("span", "", l), el("span", "", cash.format(v))); card.append(r);
     });
 
-    const cardInput = el("input"); cardInput.placeholder = "Card number (try 4242 4242 4242 4242)"; cardInput.inputMode = "numeric";
+    const payBox = el("div", "paybox");
+    const cardInput = el("input", "num");
+    cardInput.placeholder = "Card number";
+    cardInput.inputMode = "numeric";
+    cardInput.autocomplete = "cc-number";
     cardInput.setAttribute("aria-label", "Card number");
-    cardInput.style.cssText = "width:100%;margin-top:10px;padding:11px 12px;border:1px solid var(--c-border-strong);border-radius:var(--r-sm);font:inherit;background:var(--c-surface);color:inherit";
-    card.append(cardInput);
-    card.append(el("div", "opt", "Demo — mock Visa. Your card number is tokenised and never shown to the assistant."));
+    const cvvInput = el("input", "cvv");
+    cvvInput.placeholder = "CVV";
+    cvvInput.inputMode = "numeric";
+    cvvInput.maxLength = 4;
+    cvvInput.autocomplete = "cc-csc";
+    cvvInput.setAttribute("aria-label", "CVV");
+    payBox.append(cardInput, cvvInput);
+    card.append(payBox);
+    card.append(el("div", "opt", "Demo — mock Visa. The card number is tokenised and never shown to the assistant; the CVV stays in your browser."));
 
     const actions = el("div", "pact");
     const pay = el("button", "", `Confirm & pay ${cash.format(p.total)}`);
@@ -614,11 +643,18 @@
         await api("/checkout/payment-method", { session_id: state.sessionId, card_number: cardInput.value });
         const r = await api("/checkout/confirm", { session_id: state.sessionId, cart_id: p.cart_id });
         if (r.result.outcome === "completed") {
-          const settled = new Set(r.result.charges.filter((c) => c.outcome === "approved").map((c) => c.merchant_id));
+          const approved = r.result.charges.filter((c) => c.outcome === "approved");
+          const settled = new Set(approved.map((c) => c.merchant_id));
           state.cart.items = state.cart.items.filter((i) => !settled.has(i.merchant_id));
           state.cart.subtotal = state.cart.items.reduce((s, i) => s + i.unit_price * i.quantity, 0);
           state.groups = state.groups.filter((g) => !settled.has(g.merchant_id));
           renderCart(); save(); pulseBag();
+          card.classList.add("paid");
+          pay.classList.add("done");
+          pay.disabled = true;
+          cancel.disabled = true;
+          pay.textContent = approved.length === r.result.charges.length ? "✓ Processed" : "✓ Processed — some declined";
+          cardInput.disabled = true; cvvInput.disabled = true;
           for (const c of r.result.charges) {
             const ok = c.outcome === "approved";
             if (ok) toast(`${c.merchant_name}: payment approved`);
@@ -673,17 +709,35 @@
     chat({ kind: "text", text });
   }
 
+  function greeting() {
+    const r = el("div", "row");
+    r.append(el("div", "bubble", "Hi — tell me what you're shopping for and roughly your budget, and I'll do the digging."));
+    thread.append(r);
+  }
+
+  function resetChat() {
+    if (state.messages.length && !confirm("Clear this conversation and start over? Your bag and preferences will be emptied.")) return;
+    compareSel.clear();
+    trustPanel.classList.remove("open");
+    thinkingRow = null;
+    state = { sessionId: newId(), messages: [], cart: { items: [], subtotal: 0 }, groups: [], profile: {} };
+    save();
+    thread.replaceChildren();
+    toastBox.replaceChildren();
+    renderCart();
+    greeting();
+    scroll();
+    input.focus();
+  }
+  root.querySelector("#clear-chat").onclick = resetChat;
+
   // --- boot ----------------------------------------------------------
   renderCart();
   state.messages.forEach((m) => {
     if (m.sender === "user") { const r = el("div", "row me"); r.append(el("div", "bubble", m.item.text)); thread.append(r); }
     else draw(m.item);
   });
-  if (!state.messages.length) {
-    const r = el("div", "row");
-    r.append(el("div", "bubble", "Hi — tell me what you're shopping for and roughly your budget, and I'll do the digging."));
-    thread.append(r);
-  }
+  if (!state.messages.length) greeting();
   scroll();
 
   form.onsubmit = (e) => {

@@ -15,8 +15,9 @@
 import { randomBytes } from "node:crypto";
 import express from "express";
 import { CATEGORIES, CATEGORY_TEMPLATES, isCategory } from "./categories.js";
-import { parseProductsCsv } from "./csv.js";
+import { parseProductsCsv, previewProductsCsv } from "./csv.js";
 import { extractProducts } from "./extract.js";
+import { importFeed } from "./feed.js";
 import { normalizeProduct } from "./normalize.js";
 import {
   createMerchantUser,
@@ -24,6 +25,7 @@ import {
   getMerchantUser,
   listMerchants,
   listProducts,
+  setMerchantAiEnabled,
   upsertMerchant,
   upsertProducts,
 } from "./repo.js";
@@ -188,22 +190,90 @@ export function createApp(opts = {}) {
   });
 
   // --- CSV upload path ---------------------------------------------------
+  const csvFrom = (body) =>
+    typeof body === "string" ? body : typeof body?.csv === "string" ? body.csv : null;
+
   app.post("/merchants/:merchant_id/products/csv", guard, async (req, res, next) => {
     try {
       const merchant = await getMerchant(req.params.merchant_id);
       if (!merchant) return fail(res, 404, "merchant_not_found", "onboard the merchant first");
 
-      const csvText =
-        typeof req.body === "string" ? req.body : typeof req.body?.csv === "string" ? req.body.csv : null;
+      const csvText = csvFrom(req.body);
       if (!csvText || !csvText.trim())
-        return fail(res, 422, "missing_csv", "send CSV as text/csv body or { csv: \"...\" }");
+        return fail(res, 422, "missing_csv", "send CSV as text/csv body or { csv: \"...\", overrides?: {} }");
 
+      const overrides = (typeof req.body === "object" && req.body?.overrides) || {};
       const { products, errors } = parseProductsCsv(csvText, {
         merchant_id: merchant.merchant_id,
         category: merchant.category,
+        overrides,
       });
       const result = products.length ? await upsertProducts(products) : { inserted: 0, updated: 0 };
       res.status(errors.length && !products.length ? 422 : 200).json({ ...result, errors });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Non-persisting preview for the dashboard's "map columns" step.
+  app.post("/merchants/:merchant_id/products/preview", guard, async (req, res, next) => {
+    try {
+      const merchant = await getMerchant(req.params.merchant_id);
+      if (!merchant) return fail(res, 404, "merchant_not_found", "onboard the merchant first");
+      const csvText = csvFrom(req.body);
+      if (!csvText || !csvText.trim()) return fail(res, 422, "missing_csv", "send CSV as text/csv or { csv }");
+      res.json(
+        previewProductsCsv(csvText, {
+          merchant_id: merchant.merchant_id,
+          category: merchant.category,
+          overrides: (typeof req.body === "object" && req.body?.overrides) || {},
+        }),
+      );
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // --- Feed-URL ingest ("connect a commerce API") ----------------------
+  app.post("/merchants/:merchant_id/products/import-feed", guard, async (req, res, next) => {
+    try {
+      const merchant = await getMerchant(req.params.merchant_id);
+      if (!merchant) return fail(res, 404, "merchant_not_found", "onboard the merchant first");
+      const url = String(req.body?.url ?? "").trim();
+      if (!url) return fail(res, 422, "missing_url", "{ url } is required");
+
+      let feed;
+      try {
+        feed = await importFeed({
+          merchant_id: merchant.merchant_id,
+          category: merchant.category,
+          url,
+          overrides: req.body?.overrides || {},
+          fetchImpl: opts.feedFetch,
+        });
+      } catch (err) {
+        return fail(res, 422, "feed_error", err.message);
+      }
+      const result = feed.products.length ? await upsertProducts(feed.products) : { inserted: 0, updated: 0 };
+      res.status(feed.errors.length && !feed.products.length ? 422 : 200).json({
+        ...result,
+        format: feed.format,
+        fetched: feed.fetched,
+        errors: feed.errors.slice(0, 20),
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // --- Merchant "go live" toggle --------------------------------------
+  app.post("/merchants/:merchant_id/ai-shopping", guard, async (req, res, next) => {
+    try {
+      if (typeof req.body?.enabled !== "boolean")
+        return fail(res, 422, "invalid_request", "{ enabled: boolean } is required");
+      const merchant = await setMerchantAiEnabled(req.params.merchant_id, req.body.enabled);
+      if (!merchant) return fail(res, 404, "merchant_not_found", "no such merchant");
+      res.json({ merchant });
     } catch (err) {
       next(err);
     }
@@ -285,7 +355,7 @@ export function createApp(opts = {}) {
         return fail(res, 422, "invalid_request", "query (string) is required; use \"\" to browse by filter only");
       if (b.filters !== undefined && (typeof b.filters !== "object" || b.filters === null))
         return fail(res, 422, "invalid_request", "filters must be an object");
-      res.json(await searchProducts(null, { query: b.query, max_price: b.max_price, filters: b.filters }));
+      res.json(await searchProducts(null, { query: b.query, max_price: b.max_price, filters: b.filters, rank_hints: b.rank_hints }));
     } catch (err) {
       next(err);
     }
@@ -306,6 +376,7 @@ export function createApp(opts = {}) {
         query: b.query,
         max_price: b.max_price,
         filters: b.filters,
+        rank_hints: b.rank_hints,
       });
       res.json(result);
     } catch (err) {

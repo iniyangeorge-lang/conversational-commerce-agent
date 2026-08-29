@@ -13,6 +13,7 @@
     "merchant_id": { "type": "string" },
     "name": { "type": "string" },
     "description": { "type": "string" },
+    "brand": { "type": "string" },
     "price": { "type": "number", "minimum": 0 },
     "currency": { "type": "string", "enum": ["USD"] },
     "category": { "type": "string", "enum": ["food", "fashion", "electronics", "travel"] },

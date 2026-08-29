@@ -11,9 +11,9 @@ import { fileURLToPath } from "node:url";
 import { createApp } from "../src/app.js";
 import { migrate, pool, query } from "../src/db.js";
 import { searchProducts } from "../src/search.js";
-import { upsertMerchant, upsertProducts } from "../src/repo.js";
+import { getEmbeddingRows, upsertMerchant, upsertProducts } from "../src/repo.js";
 import { parseProductsCsv } from "../src/csv.js";
-import { backfillEmbeddings } from "../src/embeddings.js";
+import { backfillEmbeddings, embedFields } from "../src/embeddings.js";
 
 const fixturesDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -96,6 +96,77 @@ test("attribute-contains filter (size)", async () => {
   const nine = await searchProducts(merchant_id, { query: "", filters: { size: "9" } });
   assert.ok(nine.results.length > 0);
   assert.ok(nine.results.every((r) => r.attributes.size.includes("9")));
+});
+
+test("embedFields: builds from whichever fields are present, drops empties", () => {
+  const full = embedFields({
+    name: "Trail Shoe", brand: "Cadence", description: "grippy outsole for mud",
+    category: "fashion", attributes: { size: ["9"], activity: "trail" },
+  });
+  assert.equal(full.length, 3); // title + description + facets
+  assert.deepEqual(full.map((f) => f.weight), [0.5, 0.3, 0.2]);
+  assert.equal(full[0].text, "Trail Shoe. Cadence");
+
+  const sparse = embedFields({ name: "Trail Shoe", description: "", category: "fashion", attributes: {} });
+  assert.deepEqual(sparse.map((f) => f.text), ["Trail Shoe", "fashion"]); // no description component
+});
+
+test("stored doc vectors are the unit-length blend, tagged with the doc version", async () => {
+  const rows = await getEmbeddingRows(merchant_id);
+  assert.ok(rows.length >= 18);
+  for (const r of rows) {
+    assert.ok(String(r.model).endsWith("#mf1"));
+    const norm = Math.sqrt(r.vector.reduce((s, x) => s + x * x, 0));
+    assert.ok(Math.abs(norm - 1) < 1e-6, `${r.product_id} vector should be unit length (got ${norm})`);
+  }
+});
+
+test("a name match outranks a body-only mention", async () => {
+  // "chukka" appears only in prod_006's name; other suede/boot products mention
+  // similar materials in prose. The 0.5-weighted title field should win.
+  const { results } = await searchProducts(merchant_id, { query: "chukka boot" });
+  assert.equal(results[0].product_id, "prod_006");
+});
+
+test("footwear filters: activity, waterproof, brand, numeric range", async () => {
+  const trail = await searchProducts(merchant_id, { query: "", filters: { activity: "trail" } });
+  assert.ok(trail.results.length > 0);
+  assert.ok(trail.results.every((r) => r.attributes.activity === "trail"));
+
+  const wp = await searchProducts(merchant_id, { query: "", filters: { waterproof: true } });
+  assert.ok(wp.results.length > 0);
+  assert.ok(wp.results.every((r) => String(r.attributes.waterproof).toLowerCase() === "yes"));
+  assert.ok(wp.results.some((r) => r.product_id === "prod_007"));
+
+  const cadence = await searchProducts(merchant_id, { query: "", filters: { brand: "cadence" } });
+  assert.ok(cadence.results.length > 0);
+  assert.ok(cadence.results.every((r) => /cadence/i.test(r.brand)));
+
+  const light = await searchProducts(merchant_id, { query: "racing shoe", filters: { weight_g: { max: 200 } } });
+  assert.ok(light.results.every((r) => Number(r.attributes.weight_g) <= 200));
+  assert.ok(light.results.some((r) => r.product_id === "prod_005")); // 181 g racing flat
+
+  const notSlipOn = await searchProducts(merchant_id, { query: "", filters: { exclude: { closure: "slip-on" } } });
+  assert.ok(notSlipOn.results.every((r) => r.attributes.closure !== "slip-on"));
+});
+
+test("rank_hints re-rank the survivors toward the shopper's priorities", async () => {
+  const q = "running shoe";
+  const plain = await searchProducts(merchant_id, { query: q });
+  const hinted = await searchProducts(merchant_id, {
+    query: q,
+    rank_hints: { priorities: ["cushioning", "road"], primary_use: "road running", budget: 150 },
+  });
+  const rank = (r, id) => r.results.findIndex((x) => x.product_id === id);
+
+  // hints never filter
+  assert.equal(plain.results.length, hinted.results.length);
+
+  // once we know the shopper wants road + cushioning, the cushioned road shoe
+  // (prod_004) should outrank the trail shoe (prod_003), and not drop vs plain
+  assert.ok(rank(hinted, "prod_004") >= 0 && rank(hinted, "prod_003") >= 0);
+  assert.ok(rank(hinted, "prod_004") < rank(hinted, "prod_003"));
+  assert.ok(rank(hinted, "prod_004") <= rank(plain, "prod_004"));
 });
 
 test("empty query -> filter-only browse, cheapest first", async () => {

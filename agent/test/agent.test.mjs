@@ -25,11 +25,14 @@ const runner = {
 const products = [boot, runner];
 
 function fakeCatalog() {
+  const calls = { search: [] };
   return {
+    calls,
     async getMerchant(id) { return merchants[id] ?? null; },
     async listProducts(id) { return products.filter((p) => p.merchant_id === id); },
     async getProduct(mid, pid) { return products.find((p) => p.merchant_id === mid && p.product_id === pid) ?? null; },
     async searchProducts(params) {
+      calls.search.push(params);
       return {
         query: params.query,
         results: products.map((p) => ({ ...p, merchant_name: merchants[p.merchant_id].name, score: 1 })),
@@ -172,6 +175,39 @@ test("recommend_products re-validates against the catalogue and explains the mat
   assert.ok(result.agent_activity.some((l) => /Recommended/.test(l)));
 });
 
+test("compare/recommend recover when the model passes a product name as the id", async () => {
+  const responses = [
+    { choices: [{ message: { role: "assistant", content: null, tool_calls: [
+      { id: "s1", type: "function", function: { name: "search_products", arguments: '{"query":"shoes"}' } },
+    ] } }] },
+    { choices: [{ message: { role: "assistant", content: "Here are a few options:" } }] },
+    { choices: [{ message: { role: "assistant", content: null, tool_calls: [
+      // model fumbles: uses the display name as product_id, wrong merchant
+      { id: "c1", type: "function", function: { name: "compare_products", arguments: JSON.stringify({
+        items: [
+          { merchant_id: "m_alpha", product_id: "Waterproof Boot" },
+          { merchant_id: "whatever", product_id: "Beta Runner" },
+        ],
+      }) } },
+    ] } }] },
+    { choices: [{ message: { role: "assistant", content: "The boot is sturdier; I'd pick it." } }] },
+  ];
+  const a = new CommerceAgent({
+    catalog: fakeCatalog(), store: new MemoryStore(),
+    fetchImpl: async () => ({ ok: true, async json() { return responses.shift(); } }),
+  });
+  const result = await withEnv(
+    { LLM_PROVIDER: "openai", OPENAI_API_KEY: "k", ANTHROPIC_API_KEY: undefined },
+    async () => {
+      await a.handle({ session_id: "nr1", message: { kind: "text", text: "shoes" } });
+      return a.handle({ session_id: "nr1", message: { kind: "text", text: "compare those two" } });
+    },
+  );
+  const cmp = result.messages.find((m) => m.type === "comparison");
+  assert.ok(cmp, "comparison still rendered despite the fumbled ids");
+  assert.deepEqual(cmp.products.map((p) => p.product_id).sort(), ["a_boot", "b_run"]);
+});
+
 test("a hallucinated product id is rejected, never shown", async () => {
   const responses = [
     { choices: [{ message: { role: "assistant", content: null, tool_calls: [
@@ -190,7 +226,42 @@ test("a hallucinated product id is rejected, never shown", async () => {
   assert.ok(!result.messages.some((m) => m.type === "recommendation"));
 });
 
-test("compare_products builds a side-by-side table (offline)", async () => {
+test("search_products forwards footwear filters and profile rank_hints to the catalogue", async () => {
+  const catalog = fakeCatalog();
+  const a = new CommerceAgent({ catalog, store: new MemoryStore(), offline: true });
+  // profile gets a budget from the text; offline planner attaches it as rank_hints + max_price
+  await a.handle({ session_id: "sf1", message: { kind: "text", text: "trail shoes under $150" } });
+  const offlineCall = catalog.calls.search.at(-1);
+  assert.equal(offlineCall.max_price, 150);
+  assert.equal(offlineCall.rank_hints.budget, 150);
+  assert.equal(offlineCall.filters.available_only, true);
+
+  // model path: the LLM supplies footwear filters, the tool whitelists + forwards them
+  const responses = [
+    { choices: [{ message: { role: "assistant", content: null, tool_calls: [
+      { id: "s1", type: "function", function: { name: "search_products", arguments: JSON.stringify({
+        query: "trail shoe", filters: { activity: "trail", waterproof: true, cushioning: "high", category: "sneakers" },
+      }) } },
+    ] } }] },
+    { choices: [{ message: { role: "assistant", content: "Here are a few options:" } }] },
+  ];
+  const catalog2 = fakeCatalog();
+  const b = new CommerceAgent({
+    catalog: catalog2, store: new MemoryStore(),
+    fetchImpl: async () => ({ ok: true, async json() { return responses.shift(); } }),
+  });
+  await withEnv(
+    { LLM_PROVIDER: "openai", OPENAI_API_KEY: "k", ANTHROPIC_API_KEY: undefined },
+    () => b.handle({ session_id: "sf2", message: { kind: "text", text: "trail shoes" } }),
+  );
+  const modelCall = catalog2.calls.search.at(-1);
+  assert.equal(modelCall.filters.activity, "trail");
+  assert.equal(modelCall.filters.waterproof, true);
+  assert.equal(modelCall.filters.cushioning, "high");
+  assert.equal(modelCall.filters.category, undefined); // model-invented category is dropped
+});
+
+test("compare_products builds a table AND a differences + recommendation verdict (offline)", async () => {
   const a = agent();
   await a.handle({ session_id: "cmp1", message: { kind: "text", text: "shoes" } });
   const r = await a.handle({ session_id: "cmp1", message: { kind: "text", text: "compare the waterproof boot and the beta runner" } });
@@ -198,6 +269,12 @@ test("compare_products builds a side-by-side table (offline)", async () => {
   assert.equal(cmp.products.length, 2);
   assert.ok(cmp.rows.find((row) => row.label === "Price"));
   assert.ok(r.agent_activity.some((l) => /Compared/.test(l)));
+
+  // the verdict text comes after the table and names a pick
+  const idxTable = r.messages.findIndex((m) => m.type === "comparison");
+  const idxText = r.messages.findIndex((m) => m.type === "text");
+  assert.ok(idxText > idxTable, "verdict follows the table");
+  assert.match(r.messages[idxText].text, /I'd go with the /);
 });
 
 test("ask_clarifying_question renders as tappable choices", async () => {

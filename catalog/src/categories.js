@@ -15,9 +15,9 @@ export const CATEGORY_TEMPLATES = {
     agent_prompt_hint: "Ask about delivery time and any dietary restrictions.",
   },
   fashion: {
-    refine_attributes: ["size", "color"],
+    refine_attributes: ["brand", "size", "color", "activity", "waterproof", "cushioning", "width"],
     array_attributes: ["size", "color"],
-    agent_prompt_hint: "Ask for size and colour before calling request_checkout.",
+    agent_prompt_hint: "Ask for size (and colour) before checkout; use activity / cushioning / waterproof / width / brand as search filters when the shopper mentions them.",
   },
   electronics: {
     refine_attributes: ["spec_priority"],

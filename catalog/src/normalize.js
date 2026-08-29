@@ -11,6 +11,7 @@ const CORE_KEYS = new Set([
   "merchant_id",
   "name",
   "description",
+  "brand",
   "price",
   "currency",
   "category",
@@ -26,9 +27,9 @@ export const generateProductId = () => `prod_${randomBytes(6).toString("hex")}`;
 function toBool(value, fallback = true) {
   if (typeof value === "boolean") return value;
   if (value === null || value === undefined || value === "") return fallback;
-  const s = String(value).trim().toLowerCase();
-  if (["true", "t", "yes", "y", "1", "in_stock", "available"].includes(s)) return true;
-  if (["false", "f", "no", "n", "0", "out_of_stock", "unavailable"].includes(s)) return false;
+  const s = String(value).trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (["true", "t", "yes", "y", "1", "in_stock", "instock", "available", "low_stock", "limited_stock", "limited", "backorder", "back_order", "preorder", "pre_order", "active", "live", "enabled", "published"].includes(s)) return true;
+  if (["false", "f", "no", "n", "0", "out_of_stock", "outofstock", "unavailable", "sold_out", "soldout", "discontinued", "inactive", "hidden", "draft", "archived", "disabled"].includes(s)) return false;
   return fallback;
 }
 
@@ -88,6 +89,7 @@ export function normalizeProduct(raw, ctx) {
     merchant_id,
     name,
     description: String(raw.description ?? "").trim(),
+    brand: String(raw.brand ?? "").trim(),
     price: roundMoney(priceNum),
     currency,
     category,

@@ -5,14 +5,14 @@ types so services can be developed in parallel without blocking on each other.
 
 ## Layout
 
-| File | Owner phase | Covers |
-|---|---|---|
-| `src/payments.ts` | Phase 1 | `tokenize`, `charge` (approved/declined), `transactions` list, `DECLINE_TEST_CARDS` |
-| `src/catalog.ts` | Phase 2 & 3 | normalized `Product`, `Merchant`, `search_products` params/response, extract-from-text |
-| `src/agent.ts` | Phase 4 | conversation state machine, tool param shapes, cart, chat transport |
-| `src/trust.ts` | Phase 5 | `TransactionPreview`, `POST /checkout/confirm`, audit log entry |
-| `src/common.ts` | - | `Currency`, `Money`, `Timestamp`, `ErrorResponse` |
-| `schemas/*.json` | - | JSON Schema mirrors for the highest-stakes payloads |
+| File | Covers |
+|---|---|
+| `src/payments.ts` | `tokenize`, `charge` (approved/declined), `transactions` list, `DECLINE_TEST_CARDS` |
+| `src/catalog.ts` | normalized `Product` (+ `brand`, footwear attributes), `Merchant` (+ `ai_enabled`), `search_products` params/response (`filters`, `rank_hints`), ingest types (`ColumnMapping`, `CatalogPreviewResponse`, `FeedImportRequest`), extract-from-text |
+| `src/agent.ts` | conversation state machine, the 10 tool param shapes, `ShopperProfile`, cart, rich chat messages (`recommendation` / `comparison` / `choices`), `ChatResponse` (`agent_activity`, `profile`) |
+| `src/trust.ts` | grouped `TransactionPreview`, `POST /checkout/confirm` (per-merchant `charges[]`, partial success), audit log entry |
+| `src/common.ts` | `Currency`, `Money`, `Timestamp`, `ErrorResponse` |
+| `schemas/*.json` | JSON Schema mirrors for the highest-stakes payloads |
 
 ## Rules baked into the types
 

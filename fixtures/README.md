@@ -5,12 +5,21 @@ loads both and creates a dashboard login for each.
 
 | File | Contents |
 |---|---|
-| `merchant.json` + `products.csv` | **Sole & Stride** (`merchant_123`), `fashion`, tax `8.25%`. 18 footwear products. Login `demo@soleandstride.example` / `demo1234`. |
-| `merchant2.json` + `products2.csv` | **Nimbus Athletics** (`merchant_nimbus`), `fashion`, tax `7%`. 8 running-shoe products. Login `demo@nimbusathletics.example` / `demo1234`. |
-| `products.json` | The Sole & Stride products in canonical JSON form (matches `@cca/contracts` `Product`); reference only. |
+| `merchant.json` + `products.csv` | **Sole & Stride** (`merchant_123`), `fashion`, tax `8.25%`. 18 footwear products, brands `Heritage` / `Cadence` / `Voyager`. Login `demo@soleandstride.example` / `demo1234`. |
+| `merchant2.json` + `products2.csv` | **Nimbus Athletics** (`merchant_nimbus`), `fashion`, tax `7%`. 8 running-shoe products, brand `Nimbus`. Login `demo@nimbusathletics.example` / `demo1234`. |
+| `products.json` | The Sole & Stride products in canonical JSON form (matches `@cca/contracts` `Product`); reference only — regenerate with the CSV parser if the CSV changes. |
 
-CSV columns: `product_id,merchant_id,name,description,price,currency,category,image_url,size,color,availability`.
-`size` and `color` are `|`-separated. `merchant_id` in a row is ignored on upload - the path/token wins.
+CSV columns:
+`product_id,merchant_id,name,description,price,currency,category,image_url,size,color,availability,brand,activity,waterproof,cushioning,width,closure,support,drop_mm,weight_g`
+
+- `size` / `color` are `|`-separated arrays; everything after `brand` is a
+  single-valued footwear attribute (blank = not set). `brand` is a first-class
+  product field; the rest land in `attributes`.
+- `activity`: road / trail / gym / walking / casual. `waterproof`: `yes` or blank.
+  `cushioning`: minimal / balanced / high / max. `width`: narrow / regular / wide.
+  `closure`: lace / slip-on / velcro. `support`: neutral / stability.
+  `drop_mm` / `weight_g`: numbers (support range filters).
+- `merchant_id` in a row is ignored on upload — the path/token wins.
 
 ## Notes
 

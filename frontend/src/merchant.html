@@ -71,6 +71,38 @@
     /* skeleton rows */
     .sk { height: 12px; border-radius: 6px; }
 
+    /* import panel */
+    .import { margin-top: 18px; border-top: 1px solid var(--c-border); padding-top: 16px; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .tab { background: var(--c-surface-2); color: var(--c-text-2); border: 1px solid var(--c-border); box-shadow: none; padding: 8px 13px; font-weight: 650; }
+    .tab:hover { background: var(--c-primary-tint); transform: none; }
+    .tab.is-on { background: var(--c-primary-soft); color: var(--c-primary-strong); border-color: var(--c-primary); }
+    textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--c-border-strong); border-radius: var(--r-sm); font: inherit; resize: vertical; background: var(--c-surface); color: inherit; }
+    textarea:focus { border-color: var(--c-primary); box-shadow: var(--ring); outline: none; }
+    #preview { margin-top: 14px; padding: 14px; background: var(--c-surface-2); border: 1px solid var(--c-border); border-radius: var(--r-sm); }
+    #preview h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--c-text-3); }
+    .map-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 4px 0 10px; }
+    .map-table td { padding: 6px 8px; border-bottom: 1px solid var(--c-border); vertical-align: middle; }
+    .map-table td:first-child { font-weight: 650; color: var(--c-text); white-space: nowrap; }
+    .map-table select { padding: 4px 6px; font-size: 12px; border: 1px solid var(--c-border-strong); border-radius: 6px; background: var(--c-surface); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: var(--r-pill); font-size: 11px; font-weight: 700; }
+    .pill.attr { background: var(--c-surface-sunk); color: var(--c-text-2); }
+    .pill.ok { background: var(--c-success-soft); color: var(--c-success); }
+    .pill.warn { background: var(--c-error-soft); color: var(--c-error); }
+    .preview-list { margin: 6px 0 10px; padding-left: 18px; font-size: 13px; }
+    .preview-list li { margin: 3px 0; }
+    #preview .acts { display: flex; gap: 8px; margin-top: 6px; }
+
+    /* go-live switch */
+    .switch { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; user-select: none; }
+    .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .switch .track { width: 42px; height: 24px; border-radius: 999px; background: var(--c-border-strong); position: relative; transition: background var(--t) var(--ease); flex: none; }
+    .switch .track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: var(--sh-sm); transition: transform var(--t) var(--ease); }
+    .switch input:checked + .track { background: var(--c-success); }
+    .switch input:checked + .track::after { transform: translateX(18px); }
+    .switch input:focus-visible + .track { box-shadow: var(--ring); }
+    .switch-label { font-size: 12.5px; font-weight: 750; color: var(--c-text-2); }
+
     [hidden] { display: none !important; }
 
     /* auth */
@@ -154,35 +186,58 @@
           <tbody id="products"></tbody>
         </table>
       </div>
-      <div class="drop" id="drop">
-        <strong>Import products from CSV</strong><br>
-        <span class="muted">Drop a file here, or</span>
-        <button class="ghost" id="choose" style="margin-left:6px">Choose CSV</button>
-        <input type="file" id="file" accept=".csv,text/csv">
+
+      <div class="import">
+        <div class="tabs" role="tablist">
+          <button class="tab is-on" data-tab="csv">Upload CSV</button>
+          <button class="tab" data-tab="paste">Paste a list</button>
+          <button class="tab" data-tab="feed">Connect a feed</button>
+        </div>
+
+        <div class="tabpane" id="pane-csv">
+          <div class="drop" id="drop">
+            <strong>Drop a CSV file here</strong><br>
+            <span class="muted">Columns in any order — we detect and map them (SKU, Product Name, Selling Price…).</span><br>
+            <button class="ghost" id="choose" style="margin-top:8px">Choose file</button>
+            <input type="file" id="file" accept=".csv,text/csv">
+          </div>
+        </div>
+
+        <div class="tabpane" id="pane-paste" hidden>
+          <textarea id="paste-text" rows="6" placeholder="Paste a product list, a menu, a supplier price sheet — anything. The assistant extracts structured products for you to review."></textarea>
+          <div class="field-row" style="grid-template-columns:auto 1fr">
+            <button id="paste-extract">Extract with AI</button>
+            <span class="muted" id="paste-hint" style="align-self:center"></span>
+          </div>
+        </div>
+
+        <div class="tabpane" id="pane-feed" hidden>
+          <div class="field-row">
+            <div class="field"><label for="feed-url">Product feed URL (CSV or JSON)</label>
+              <input id="feed-url" placeholder="https://yourstore.com/products.csv"></div>
+            <button id="feed-import">Fetch &amp; import</button>
+          </div>
+          <span class="muted">Any public URL, up to 5 MB. We map its columns the same way as an upload. Re-run to re-sync.</span>
+        </div>
+
+        <div id="preview" hidden></div>
+        <div id="import-note"></div>
       </div>
-      <div id="import-note"></div>
     </section>
 
     <section class="card">
       <div class="row">
         <div><h2>AI shopping readiness</h2><p class="sub">How well your catalog is structured for the conversational agent.</p></div>
-        <button class="ghost" id="reload-ready">Recheck</button>
+        <label class="switch" title="When on, shoppers can find your products through the assistant">
+          <input type="checkbox" id="ai-toggle">
+          <span class="track"></span>
+          <span class="switch-label" id="ai-label">Live</span>
+        </label>
       </div>
       <div class="ready-head"><span class="ready-pct" id="ready-pct">—</span><span class="sub" id="ready-note">Checking…</span></div>
       <div class="meter"><i id="ready-bar"></i></div>
       <ul class="dims" id="ready-dims"></ul>
-    </section>
-
-    <section class="card">
-      <div class="row">
-        <div><h2>Connect a commerce API</h2><p class="sub">Already have a product API? Point us at it instead of uploading a CSV. (Demo — no real call is made.)</p></div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label for="api-url">API endpoint</label><input id="api-url" placeholder="https://example.com/api/products"></div>
-        <div class="field"><label for="api-key">API key</label><input id="api-key" type="password" placeholder="•••••••••"></div>
-        <button id="api-test">Test connection</button>
-      </div>
-      <div id="api-note"></div>
+      <button class="ghost" id="reload-ready" style="margin-top:14px">Re-check</button>
     </section>
 
     <section class="card">

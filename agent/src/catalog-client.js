@@ -19,9 +19,15 @@ export class CatalogClient {
     return body;
   }
 
+  /** The merchant, or null if it does not exist. Genuine errors still throw. */
   async getMerchant(merchantId) {
-    const body = await this.request(`/merchants/${encodeURIComponent(merchantId)}`);
-    return body.merchant;
+    try {
+      const body = await this.request(`/merchants/${encodeURIComponent(merchantId)}`);
+      return body.merchant ?? null;
+    } catch (err) {
+      if (/not found|no such merchant|\(404\)/i.test(err.message)) return null;
+      throw err;
+    }
   }
 
   /** Marketplace search - spans every merchant; results carry merchant_id + merchant_name. */

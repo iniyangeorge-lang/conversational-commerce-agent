@@ -79,12 +79,19 @@ Each sees only its own store.
 
 Once in, it's a thin read-through of the live services - no local mock state:
 
-- **Catalog** - the product list, plus CSV import (`POST .../products/csv`, 🔒)
-- **AI shopping readiness** - a score computed from the live catalog: per-dimension
-  ✓/⚠ (product info, pricing, inventory, specifications, images, variants) with a
-  count of the products missing each, and an overall %.
-- **Connect a commerce API** - a mock onboarding panel (endpoint + key →
-  "✓ Connection successful — N products detected"). No real request is made.
+- **Catalog** - the product list, plus a 3-tab importer:
+  - **Upload CSV** - drop a file → a **column-mapping preview** (detected
+    source→field, editable per column, sample rows, "N ready / M skipped") →
+    Import. Real-world headers (`SKU`, `Selling Price`, `Stock Status`…) map
+    automatically.
+  - **Paste a list** - paste raw text → AI extracts structured products → review
+    → Save.
+  - **Connect a feed** - a public CSV/JSON product-feed URL → Fetch & import
+    (re-run to re-sync).
+- **AI shopping readiness** - a score from the live catalog (product info,
+  pricing, inventory, specifications, images, variants) + a **Live / Paused**
+  toggle (`POST .../ai-shopping`) that controls whether the marketplace search
+  includes this store.
 - **Orders** - transactions from `GET :4001/mock-visa/transactions/:merchant_id` (🔒)
 
 Needs the catalog + payments services running (both send permissive CORS headers).

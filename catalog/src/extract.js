@@ -11,9 +11,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { CATEGORIES, isCategory } from "./categories.js";
 import { normalizeProduct } from "./normalize.js";
 
-// Onboarding extraction always uses Anthropic (SDK). Its own env var so a
-// non-Claude LLM_MODEL (the agent may run on OpenAI) can't break this call.
-const MODEL = process.env.EXTRACT_MODEL ?? "claude-sonnet-5";
+// Onboarding extraction runs on Anthropic (SDK) or OpenAI (raw fetch, no extra
+// dep). EXTRACT_PROVIDER forces one; otherwise it follows whichever key is set.
+const ANTHROPIC_MODEL = process.env.EXTRACT_MODEL ?? "claude-sonnet-5";
+const OPENAI_MODEL = process.env.EXTRACT_MODEL_OPENAI ?? "gpt-4.1-mini";
 
 const SYSTEM = `You extract structured product data from raw merchant text - a menu, a catalogue page, a price list.
 Identify every distinct purchasable product.
@@ -53,26 +54,52 @@ const EMIT_TOOL = {
   },
 };
 
-/** Default extractor: one forced tool call to Claude. */
+const userMessage = (category, raw_text) =>
+  `Category: ${category}\n\nMerchant text:\n"""\n${raw_text}\n"""`;
+
 async function callClaude({ category, raw_text, client }) {
   const anthropic = client ?? new Anthropic();
   const res = await anthropic.messages.create({
-    model: MODEL,
+    model: ANTHROPIC_MODEL,
     max_tokens: 16000,
     system: SYSTEM,
     tools: [EMIT_TOOL],
     tool_choice: { type: "tool", name: "emit_products" },
-    messages: [
-      {
-        role: "user",
-        content: `Category: ${category}\n\nMerchant text:\n"""\n${raw_text}\n"""`,
-      },
-    ],
+    messages: [{ role: "user", content: userMessage(category, raw_text) }],
   });
-  const block = res.content.find(
-    (b) => b.type === "tool_use" && b.name === "emit_products",
-  );
+  const block = res.content.find((b) => b.type === "tool_use" && b.name === "emit_products");
   return Array.isArray(block?.input?.products) ? block.input.products : [];
+}
+
+async function callOpenAI({ category, raw_text, fetchImpl = fetch }) {
+  const res = await fetchImpl("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content: userMessage(category, raw_text) },
+      ],
+      tools: [{ type: "function", function: { name: EMIT_TOOL.name, description: EMIT_TOOL.description, parameters: EMIT_TOOL.input_schema } }],
+      tool_choice: { type: "function", function: { name: EMIT_TOOL.name } },
+    }),
+  });
+  if (!res.ok) throw new Error(`openai ${res.status}: ${await res.text()}`);
+  const body = await res.json();
+  const args = body.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+  let parsed = {};
+  try { parsed = JSON.parse(args || "{}"); } catch { parsed = {}; }
+  return Array.isArray(parsed.products) ? parsed.products : [];
+}
+
+/** Pick the extractor by EXTRACT_PROVIDER, else whichever key is present. */
+function defaultExtractor() {
+  const forced = process.env.EXTRACT_PROVIDER?.toLowerCase();
+  if (forced === "openai" || (!forced && !process.env.ANTHROPIC_API_KEY && process.env.OPENAI_API_KEY))
+    return callOpenAI;
+  if (forced === "anthropic" || process.env.ANTHROPIC_API_KEY) return callClaude;
+  throw new Error("no extraction key set - set ANTHROPIC_API_KEY or OPENAI_API_KEY (or upload a CSV / connect a feed instead)");
 }
 
 /**
@@ -88,7 +115,7 @@ export async function extractProducts(req, deps = {}) {
     throw new Error(`category must be one of ${CATEGORIES.join(", ")}`);
   if (!raw_text || !String(raw_text).trim()) throw new Error("raw_text is required");
 
-  const run = deps.extractor ?? callClaude;
+  const run = deps.extractor ?? defaultExtractor();
   const candidates = await run({ category, raw_text, client: deps.client });
 
   const products = [];

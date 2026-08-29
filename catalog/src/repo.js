@@ -9,6 +9,7 @@ function toMerchant(row) {
     merchant_id: row.merchant_id,
     name: row.name,
     category: row.category,
+    ai_enabled: row.ai_enabled ?? true,
     spend_limit: Number(row.spend_limit),
     step_up_threshold: Number(row.step_up_threshold),
     tax_rate: Number(row.tax_rate),
@@ -22,6 +23,7 @@ function toProduct(row) {
     ...(row.merchant_name ? { merchant_name: row.merchant_name } : {}),
     name: row.name,
     description: row.description,
+    ...(row.brand ? { brand: row.brand } : {}),
     price: Number(row.price),
     currency: row.currency,
     category: row.category,
@@ -33,14 +35,15 @@ function toProduct(row) {
 
 export async function upsertMerchant(m) {
   const { rows } = await query(
-    `INSERT INTO merchants (merchant_id, name, category, spend_limit, step_up_threshold, tax_rate)
-     VALUES ($1, $2, $3, COALESCE($4::numeric, 150.00), COALESCE($5::numeric, 100.00), COALESCE($6::numeric, 0))
+    `INSERT INTO merchants (merchant_id, name, category, spend_limit, step_up_threshold, tax_rate, ai_enabled)
+     VALUES ($1, $2, $3, COALESCE($4::numeric, 150.00), COALESCE($5::numeric, 100.00), COALESCE($6::numeric, 0), COALESCE($7::boolean, true))
      ON CONFLICT (merchant_id) DO UPDATE SET
        name = EXCLUDED.name,
        category = EXCLUDED.category,
        spend_limit = EXCLUDED.spend_limit,
        step_up_threshold = EXCLUDED.step_up_threshold,
-       tax_rate = EXCLUDED.tax_rate
+       tax_rate = EXCLUDED.tax_rate,
+       ai_enabled = COALESCE($7::boolean, merchants.ai_enabled)
      RETURNING *`,
     [
       m.merchant_id,
@@ -49,6 +52,7 @@ export async function upsertMerchant(m) {
       m.spend_limit ?? null,
       m.step_up_threshold ?? null,
       m.tax_rate ?? null,
+      typeof m.ai_enabled === "boolean" ? m.ai_enabled : null,
     ],
   );
   return toMerchant(rows[0]);
@@ -56,6 +60,15 @@ export async function upsertMerchant(m) {
 
 export async function getMerchant(merchant_id) {
   const { rows } = await query(`SELECT * FROM merchants WHERE merchant_id = $1`, [merchant_id]);
+  return rows[0] ? toMerchant(rows[0]) : null;
+}
+
+/** Merchant "go live" toggle. Returns the updated merchant, or null if unknown. */
+export async function setMerchantAiEnabled(merchant_id, enabled) {
+  const { rows } = await query(
+    `UPDATE merchants SET ai_enabled = $2 WHERE merchant_id = $1 RETURNING *`,
+    [merchant_id, Boolean(enabled)],
+  );
   return rows[0] ? toMerchant(rows[0]) : null;
 }
 
@@ -75,11 +88,12 @@ export async function upsertProducts(products) {
     const id = p.product_id || generateProductId();
     const { rows } = await query(
       `INSERT INTO products
-         (product_id, merchant_id, name, description, price, currency, category, image_url, attributes, availability)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
+         (product_id, merchant_id, name, description, brand, price, currency, category, image_url, attributes, availability)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11)
        ON CONFLICT (merchant_id, product_id) DO UPDATE SET
          name = EXCLUDED.name,
          description = EXCLUDED.description,
+         brand = EXCLUDED.brand,
          price = EXCLUDED.price,
          currency = EXCLUDED.currency,
          category = EXCLUDED.category,
@@ -93,6 +107,7 @@ export async function upsertProducts(products) {
         p.merchant_id,
         p.name,
         p.description,
+        p.brand ?? "",
         p.price,
         p.currency,
         p.category,
@@ -113,8 +128,10 @@ export async function listProducts(merchant_id) {
   const { rows } = merchant_id
     ? await query(`SELECT * FROM products WHERE merchant_id = $1 ORDER BY product_id`, [merchant_id])
     : await query(
+        // marketplace scope: only stores that have gone live
         `SELECT p.*, m.name AS merchant_name
          FROM products p JOIN merchants m ON m.merchant_id = p.merchant_id
+         WHERE m.ai_enabled
          ORDER BY p.merchant_id, p.product_id`,
       );
   return rows.map(toProduct);

@@ -4,12 +4,17 @@ CREATE TABLE IF NOT EXISTS merchants (
   merchant_id       TEXT PRIMARY KEY,
   name              TEXT NOT NULL,
   category          TEXT NOT NULL CHECK (category IN ('food', 'fashion', 'electronics', 'travel')),
+  -- Merchant "go live" switch: when false the marketplace search skips this
+  -- store's products (the dashboard still shows them).
+  ai_enabled        BOOLEAN NOT NULL DEFAULT true,
   -- Phase 5 trust-layer config. Defaults are the demo defaults.
   spend_limit       NUMERIC(12,2) NOT NULL DEFAULT 150.00,
   step_up_threshold NUMERIC(12,2) NOT NULL DEFAULT 100.00,
   tax_rate          NUMERIC(6,4)  NOT NULL DEFAULT 0,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE merchants ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN NOT NULL DEFAULT true;
 
 -- Dashboard logins. One or more users per merchant (Phase: merchant auth).
 CREATE TABLE IF NOT EXISTS merchant_users (
@@ -27,6 +32,7 @@ CREATE TABLE IF NOT EXISTS products (
   product_id   TEXT NOT NULL,
   name         TEXT NOT NULL,
   description  TEXT NOT NULL DEFAULT '',
+  brand        TEXT NOT NULL DEFAULT '',
   price        NUMERIC(12,2) NOT NULL CHECK (price >= 0),
   currency     TEXT NOT NULL DEFAULT 'USD',
   category     TEXT NOT NULL CHECK (category IN ('food', 'fashion', 'electronics', 'travel')),
@@ -37,6 +43,9 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (merchant_id, product_id)
 );
+
+-- Additive migration for existing dev databases.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS brand TEXT NOT NULL DEFAULT '';
 
 -- Phase 3: one embedding per product. Kept as JSON (not pgvector) so the
 -- prototype needs no extra Postgres extension; cosine similarity runs in-process.
