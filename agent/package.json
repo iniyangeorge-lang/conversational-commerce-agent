@@ -8,11 +8,13 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "convo": "node src/scripted-convo.js",
+    "trust:convo": "node src/trust-scripted-convo.js",
     "test": "node --test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@cca/contracts": "*"
+    "@cca/contracts": "*",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "typescript": "^5.5.0"

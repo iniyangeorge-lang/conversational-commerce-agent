@@ -29,15 +29,38 @@ export interface CheckoutConfirmRequest {
   step_up_code?: string;
 }
 
+/** Tokenize a card before checkout. The PAN is used only in this request and is
+ * never persisted by the trust layer; the session stores only the Visa token. */
+export interface PaymentMethodTokenizeRequest {
+  session_id: string;
+  card_number: string;
+}
+
+export interface PaymentMethodTokenizeResponse {
+  session_id: string;
+  card_last4: string;
+}
+
 export type CheckoutConfirmResult =
   | { outcome: "approved"; transaction_id: string; auth_code: string; total: Money }
   | { outcome: "declined"; transaction_id: string; decline_reason: DeclineReason }
-  | { outcome: "blocked"; reason: "spend_cap_exceeded" | "step_up_required" | "step_up_invalid" | "cart_changed"; message: string };
+  | { outcome: "blocked"; reason: "spend_cap_exceeded" | "step_up_required" | "step_up_invalid" | "cart_changed" | "checkout_not_pending" | "payment_method_required" | "payment_service_unavailable" | "catalog_unavailable"; message: string };
 
 export interface CheckoutConfirmResponse {
   session_id: string;
   cart_id: string;
   result: CheckoutConfirmResult;
+}
+
+export interface CheckoutCancelRequest {
+  session_id: string;
+  cart_id: string;
+}
+
+export interface CheckoutCancelResponse {
+  session_id: string;
+  cart_id: string;
+  result: { outcome: "cancelled" } | CheckoutConfirmResult;
 }
 
 // --- Audit log (written on every confirm attempt) ---

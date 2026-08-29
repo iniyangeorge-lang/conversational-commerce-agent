@@ -49,6 +49,24 @@ Redis under `cca:agent:session:<session_id>`. The service falls back to an
 in-memory store if Redis is not reachable, so the agent remains usable during
 development; restart loses those in-memory sessions.
 
+## Trust & consent API (Phase 5)
+
+The agent service also hosts the trust layer. The browser uses these endpoints;
+the LLM never has access to them as tools:
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/checkout/payment-method` | Tokenize a card through the payments service; only the token and last-4 are stored in the session. |
+| POST | `/checkout/confirm` | Rebuild and validate the cart, enforce spend cap/step-up, then call mock Visa. |
+| POST | `/checkout/cancel` | Cancel the pending confirmation and write a cancel audit entry. |
+| GET | `/checkout/audit/:session_id` | Inspect the demo audit trail. |
+
+`/checkout/confirm` does not accept an amount from the client. The server reads
+the session cart, re-checks current catalog prices and availability, computes
+tax and total, and uses an idempotent order reference for the payment call.
+The default demo step-up code is `1234` and can be changed with `STEP_UP_CODE`.
+Audit entries are stored in Postgres in `checkout_audit_log`.
+
 ## Tools (function-calling schema)
 
 | Tool | Does |
@@ -87,6 +105,13 @@ not require Postgres, Redis, or an LLM key:
 
 ```bash
 npm test -w @cca/agent
+```
+
+After starting the catalog, payments, and agent services, the Phase 5 smoke
+flow exercises tokenization → preview → explicit confirm → approved payment:
+
+```bash
+npm run trust:convo -w @cca/agent
 ```
 
 Contracts: `@cca/contracts` -> `src/agent.ts`.

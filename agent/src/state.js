@@ -170,5 +170,11 @@ export function createSession(sessionId, merchantId, merchant) {
     history: [],
     last_search: [],
     checkout_intent: false,
+    checkout_preview: null,
+    payment_token: null,
+    card_last4: null,
+    total_spent: 0,
+    charge_attempt: 0,
+    checkout_result: null,
   };
 }

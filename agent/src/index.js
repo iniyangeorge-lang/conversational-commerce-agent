@@ -2,8 +2,6 @@
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createApp } from "./app.js";
-import { createDefaultAgent } from "./agent.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 for (const candidate of [
@@ -18,18 +16,36 @@ for (const candidate of [
   }
 }
 
+// Load configuration before importing modules that construct database/client
+// defaults, so a repo-root .env overrides the documented local defaults.
+const { createApp } = await import("./app.js");
+const { createDefaultAgent } = await import("./agent.js");
+const { createDefaultTrust } = await import("./trust.js");
+
 const port = Number(process.env.AGENT_PORT ?? 4003);
-const server = createApp(createDefaultAgent());
-server.listen(port, () => {
-  console.log(`[agent] service listening on :${port}`);
-  if (!process.env.ANTHROPIC_API_KEY)
-    console.warn("[agent] ANTHROPIC_API_KEY not set - using the offline planner");
-});
+const agent = createDefaultAgent();
+const trust = createDefaultTrust({ store: agent.store, catalog: agent.catalog });
 
-function shutdown(signal) {
-  console.log(`[agent] ${signal} received - shutting down`);
-  server.close(() => process.exit(0));
-}
+trust.migrate()
+  .then(() => {
+    const server = createApp(agent, trust);
+    server.listen(port, () => {
+      console.log(`[agent] service listening on :${port}`);
+      if (!process.env.ANTHROPIC_API_KEY)
+        console.warn("[agent] ANTHROPIC_API_KEY not set - using the offline planner");
+    });
 
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));
+    const shutdown = (signal) => {
+      console.log(`[agent] ${signal} received - shutting down`);
+      server.close(async () => {
+        await trust.close();
+        process.exit(0);
+      });
+    };
+    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+  })
+  .catch((err) => {
+    console.error(`[agent] failed to start: ${err.message}`);
+    process.exit(1);
+  });

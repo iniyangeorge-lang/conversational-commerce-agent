@@ -115,6 +115,8 @@ export function createToolExecutor({ catalog }) {
       else session.cart.items.push({ product_id: product.product_id, name: product.name, quantity, unit_price: roundMoney(product.price) });
       session.cart.subtotal = cartTotal(session.cart);
       session.state = "cart_building";
+      session.checkout_preview = null;
+      session.checkout_result = null;
       return toolOk({ added: { product_id: product.product_id, name: product.name, quantity }, cart: session.cart });
     }
 
@@ -130,6 +132,7 @@ export function createToolExecutor({ catalog }) {
       if (!session.checkout_intent)
         return toolError("wait until the shopper explicitly asks to check out", "explicit_consent_required");
       const preview = checkoutPreview(session);
+      session.checkout_preview = preview;
       session.state = "awaiting_confirmation";
       return toolOk({ preview });
     }
