@@ -107,3 +107,27 @@ export async function listProducts(merchant_id) {
   );
   return rows.map(toProduct);
 }
+
+// --- Phase 3: embeddings ------------------------------------------------
+
+export async function upsertEmbedding({ merchant_id, product_id, model, dim, vector }) {
+  await query(
+    `INSERT INTO product_embeddings (merchant_id, product_id, model, dim, vector)
+     VALUES ($1, $2, $3, $4, $5::jsonb)
+     ON CONFLICT (merchant_id, product_id) DO UPDATE SET
+       model = EXCLUDED.model,
+       dim = EXCLUDED.dim,
+       vector = EXCLUDED.vector,
+       updated_at = now()`,
+    [merchant_id, product_id, model, dim, JSON.stringify(vector)],
+  );
+}
+
+/** @returns {Promise<{ product_id: string, model: string, vector: number[] }[]>} */
+export async function getEmbeddingRows(merchant_id) {
+  const { rows } = await query(
+    `SELECT product_id, model, vector FROM product_embeddings WHERE merchant_id = $1`,
+    [merchant_id],
+  );
+  return rows;
+}

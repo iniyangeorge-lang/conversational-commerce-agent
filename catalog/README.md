@@ -1,63 +1,82 @@
-# @cca/catalog - Onboarding + normalized catalog (Phase 2)
+# @cca/catalog - Onboarding, normalized catalog, search (Phases 2-3)
 
 Turn whatever a merchant provides into one normalized `Product` schema, store it
-in Postgres. Phase 3 adds `search_products` on top.
+in Postgres, and expose `search_products` for the agent.
 
 ## Run
 
 ```bash
 docker compose up -d
 npm run migrate -w @cca/catalog      # create tables
-npm run seed    -w @cca/catalog      # load fixtures/ via the CSV path (18 products)
+npm run seed    -w @cca/catalog      # fixtures/ -> Postgres (CSV path) + embeddings
+npm run embed   -w @cca/catalog      # (re)build embeddings for every merchant; --force to redo
 npm run dev     -w @cca/catalog      # http://localhost:4002 (auto-migrates on boot)
-npm test        -w @cca/catalog      # needs Postgres; the LLM call is stubbed
+npm test        -w @cca/catalog      # needs Postgres; LLM + embedder are offline in tests
 ```
 
-Config: `CATALOG_PORT` (default `4002`), `DATABASE_URL`, `ANTHROPIC_API_KEY` +
-`LLM_MODEL` (default `claude-sonnet-5`, from `.env.example`) for the extract path.
+Config: `CATALOG_PORT` (4002), `DATABASE_URL`, `ANTHROPIC_API_KEY` + `LLM_MODEL`
+(`claude-sonnet-5`) for extract, `EMBEDDING_PROVIDER` for search.
 
 ## Endpoints
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/health` | `{ status: "ok" }` when the DB is reachable |
-| GET | `/categories` / `/categories/:category` | category templates (which attributes the agent asks about) |
-| POST | `/merchants` | `{ merchant_id, name, category, spend_limit?, step_up_threshold?, tax_rate? }` -> upsert |
+| GET | `/health` | ok when the DB is reachable |
+| GET | `/categories` / `/categories/:category` | category templates |
+| POST | `/merchants` | `{ merchant_id, name, category, spend_limit?, step_up_threshold?, tax_rate? }` upsert |
 | GET | `/merchants/:merchant_id` | merchant + trust-layer config |
-| POST | `/merchants/:merchant_id/products/csv` | body `text/csv` (or `{ csv }`). Fixed column order. -> `{ inserted, updated, errors }` |
-| POST | `/merchants/:merchant_id/products/extract` | `{ raw_text, category? }` -> `{ products, errors }`. LLM extraction. **Does not persist** - products come back without `product_id` for review. |
-| POST | `/merchants/:merchant_id/products` | `{ products: [...] }` -> normalize + upsert reviewed products |
+| POST | `/merchants/:merchant_id/products/csv` | `text/csv` body (or `{ csv }`) -> `{ inserted, updated, errors }` |
+| POST | `/merchants/:merchant_id/products/extract` | `{ raw_text, category? }` -> `{ products, errors }` (LLM; **does not persist**) |
+| POST | `/merchants/:merchant_id/products` | `{ products: [...] }` -> normalize + upsert |
 | GET | `/merchants/:merchant_id/products` | `{ count, products[] }` |
+| POST | `/merchants/:merchant_id/search` | `{ query, max_price?, filters? }` -> `{ query, results[] }` (Phase 3) |
+| POST | `/merchants/:merchant_id/embed` | `{ force? }` -> rebuild this merchant's embeddings |
 
 Contract shapes: `@cca/contracts` -> `src/catalog.ts`.
 
-## Onboarding paths
+## Search (Phase 3)
 
-1. **CSV upload** - `product_id,merchant_id,name,description,price,currency,category,image_url,<attrs...>,availability`.
-   Core columns map to the schema; any extra column (`size`, `color`, ...) becomes an
-   attribute. Multi-valued attribute columns are `|`-separated. `merchant_id` in the
-   row is ignored - the path parameter wins.
-2. **Extract-from-text** - paste a menu / catalogue page as `raw_text`; Claude returns
-   a structured product list via a forced tool call. Every candidate is run through the
-   same normalizer as the CSV path; unpriced / malformed ones are reported in `errors`,
-   not persisted. No-code merchant setup.
-3. **Category template** - `POST /merchants` stores `category`; it drives which system
-   prompt and refine-attributes the agent uses later (`src/categories.js`).
+`searchProducts(merchant_id, { query, max_price?, filters? })` - the single function
+Phase 4 calls as a tool (also exposed as `POST .../search`).
 
-### Trying the extract path
+- **Semantic rank**: cosine similarity of the query embedding vs each product's
+  `name + description` embedding. Empty `query` -> filter-only browse, cheapest first.
+- **Hard filters** (applied after ranking, they remove not re-rank):
+  `filters.category`, `max_price` (top-level or `filters.max_price`),
+  `filters.size` / `filters.color` / `filters.dietary` (attribute-contains),
+  `filters.attributes: { key: value }` (generic), `filters.available_only`
+  (**default true** - out-of-stock hidden unless set false).
+- Returns the **top 5**, each with a `score`.
 
-Unit/integration tests stub the model. To exercise it for real:
+### Embeddings
 
-```bash
-ANTHROPIC_API_KEY=sk-ant-... npm run extract:demo -w @cca/catalog     # prints, no DB write
+"Any small model is fine." Provider is pluggable (`src/embedder.js`):
+
+| `EMBEDDING_PROVIDER` | What |
+|---|---|
+| `hash` (default) | zero-dependency, offline, deterministic lexical embedding (word tokens + char trigrams -> 512-d, L2-normalized). Good when the query and catalogue share vocabulary. |
+| `voyage` | real semantic embeddings via api.voyageai.com; auto-selected when `VOYAGE_API_KEY` is set. |
+
+Vectors live in `product_embeddings` as JSON (no pgvector - documented future swap);
+cosine runs in-process. `seed` and every `/search` lazily backfill missing embeddings.
+
+Example (seeded data):
+
+```
+POST /merchants/merchant_123/search  { "query": "waterproof boots for muddy trails" }
+  0.413  prod_007  Waterproof Hiking Boot   $159
+  0.244  prod_003  Trail Running Shoe       $128
+  0.240  prod_018  Insulated Winter Boot    $148
 ```
 
-or against a running server:
+### Trying the extract path (needs a key)
 
 ```bash
+ANTHROPIC_API_KEY=sk-ant-... npm run extract:demo -w @cca/catalog
+# or:
 curl -s -X POST localhost:4002/merchants/merchant_123/products/extract \
   -H 'content-type: application/json' \
-  -d '{"raw_text":"Trailhead GTX waterproof boot $164, sizes 8-13. Cloudline Runner trainer $138."}'
+  -d '{"raw_text":"Trailhead GTX waterproof boot $164, sizes 8-13. Cloudline Runner $138."}'
 ```
 
 ## Data model
@@ -65,23 +84,28 @@ curl -s -X POST localhost:4002/merchants/merchant_123/products/extract \
 ```
 merchants(merchant_id PK, name, category, spend_limit, step_up_threshold, tax_rate, created_at)
 products(merchant_id -> merchants, product_id, name, description, price NUMERIC(12,2),
-         currency, category, image_url, attributes JSONB, availability, created_at, updated_at,
+         currency, category, image_url, attributes JSONB, availability, timestamps,
+         PRIMARY KEY (merchant_id, product_id))
+product_embeddings(merchant_id, product_id -> products, model, dim, vector JSONB, updated_at,
          PRIMARY KEY (merchant_id, product_id))
 ```
 
-`product_id` is unique **within** a merchant, not globally. Schema is applied on every
-boot (`CREATE TABLE IF NOT EXISTS`). Changing it means dropping the tables in dev.
+`product_id` is unique **within** a merchant. Schema applied on every boot
+(`CREATE TABLE IF NOT EXISTS`); changing it means dropping the tables in dev.
 
 ## Files
 
 | File | Role |
 |---|---|
-| `src/app.js` | Express app + routes (exported for tests; `createApp({ extractor })` stubs the LLM) |
+| `src/app.js` | Express app + routes (`createApp({ extractor })` stubs the LLM) |
 | `src/normalize.js` | raw row/object -> canonical `Product`, with validation |
 | `src/csv.js` | CSV text -> normalized products + per-row errors |
 | `src/extract.js` | raw text -> Claude forced tool call -> normalized products |
 | `src/categories.js` | the four category templates |
-| `src/repo.js` | merchant + product upsert / read |
-| `src/db.js` | pg pool, `migrate()` | 
-| `src/seed.js` | fixtures/ -> Postgres via the CSV path |
-| `test/catalog.test.mjs` | Phase 2 DoD as `node --test` cases |
+| `src/embedder.js` | `hash` / `voyage` providers + cosine |
+| `src/embeddings.js` | `backfillEmbeddings(merchant_id)` - idempotent |
+| `src/search.js` | `searchProducts()` - semantic rank + hard filters, top 5 |
+| `src/repo.js` | merchant / product / embedding DB ops |
+| `src/db.js`, `src/migrate.js` | Postgres |
+| `src/seed.js`, `src/embed.js` | fixtures loader, embedding backfill CLI |
+| `test/catalog.test.mjs`, `test/search.test.mjs` | Phase 2-3 DoD as `node --test` |

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { migrate, pool } from "./db.js";
 import { parseProductsCsv } from "./csv.js";
 import { upsertMerchant, upsertProducts } from "./repo.js";
+import { backfillEmbeddings } from "./embeddings.js";
 
 const fixturesDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -39,6 +40,9 @@ async function main() {
   console.log(
     `[catalog] seeded ${merchant.name} (${merchant.merchant_id}): ${inserted} inserted, ${updated} updated, ${errors.length} skipped`,
   );
+
+  const emb = await backfillEmbeddings(merchant.merchant_id);
+  console.log(`[catalog] embeddings: ${emb.embedded} generated (${emb.model}), ${emb.total} total`);
 
   await pool.end();
   if (errors.length) process.exitCode = 1;

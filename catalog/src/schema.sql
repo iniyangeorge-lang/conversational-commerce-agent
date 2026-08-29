@@ -28,3 +28,17 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (merchant_id, product_id)
 );
+
+-- Phase 3: one embedding per product. Kept as JSON (not pgvector) so the
+-- prototype needs no extra Postgres extension; cosine similarity runs in-process.
+CREATE TABLE IF NOT EXISTS product_embeddings (
+  merchant_id TEXT NOT NULL,
+  product_id  TEXT NOT NULL,
+  model       TEXT NOT NULL,
+  dim         INTEGER NOT NULL,
+  vector      JSONB NOT NULL,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (merchant_id, product_id),
+  FOREIGN KEY (merchant_id, product_id)
+    REFERENCES products (merchant_id, product_id) ON DELETE CASCADE
+);

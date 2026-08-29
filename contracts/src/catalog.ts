@@ -45,10 +45,15 @@ export interface Merchant {
 export interface SearchProductsFilters {
   category?: ProductCategory;
   max_price?: Money;
-  /** Match products offered in this size (footwear demo). */
+  /** Match products whose `attributes.size` contains this value (footwear demo). */
   size?: string;
-  /** Match products offered in this color (footwear demo). */
+  /** Match products whose `attributes.color` contains this value (footwear demo). */
   color?: string;
+  /** Match products whose `attributes.dietary` contains this value (food). */
+  dietary?: string;
+  /** Generic attribute-contains filters: `{ material: "leather" }`. */
+  attributes?: Record<string, string | string[]>;
+  /** Default true - out-of-stock products are hidden unless this is false. */
   available_only?: boolean;
 }
 

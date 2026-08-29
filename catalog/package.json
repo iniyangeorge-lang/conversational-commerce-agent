@@ -9,6 +9,7 @@
     "start": "node src/index.js",
     "migrate": "node src/migrate.js",
     "seed": "node src/seed.js",
+    "embed": "node src/embed.js",
     "extract:demo": "node src/extract-demo.js",
     "test": "node --test",
     "typecheck": "tsc --noEmit"

@@ -23,6 +23,8 @@ import {
   upsertMerchant,
   upsertProducts,
 } from "./repo.js";
+import { backfillEmbeddings } from "./embeddings.js";
+import { searchProducts } from "./search.js";
 import { query } from "./db.js";
 
 function fail(res, status, code, message, details) {
@@ -184,6 +186,40 @@ export function createApp(opts = {}) {
     try {
       const products = await listProducts(req.params.merchant_id);
       res.json({ merchant_id: req.params.merchant_id, count: products.length, products });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // --- Phase 3: search + embedding backfill -------------------------------
+  app.post("/merchants/:merchant_id/search", async (req, res, next) => {
+    try {
+      const merchant = await getMerchant(req.params.merchant_id);
+      if (!merchant) return fail(res, 404, "merchant_not_found", "onboard the merchant first");
+
+      const b = req.body ?? {};
+      if (typeof b.query !== "string")
+        return fail(res, 422, "invalid_request", "query (string) is required; use \"\" to browse by filter only");
+      if (b.filters !== undefined && (typeof b.filters !== "object" || b.filters === null))
+        return fail(res, 422, "invalid_request", "filters must be an object");
+
+      const result = await searchProducts(merchant.merchant_id, {
+        query: b.query,
+        max_price: b.max_price,
+        filters: b.filters,
+      });
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.post("/merchants/:merchant_id/embed", async (req, res, next) => {
+    try {
+      const merchant = await getMerchant(req.params.merchant_id);
+      if (!merchant) return fail(res, 404, "merchant_not_found", "onboard the merchant first");
+      const result = await backfillEmbeddings(merchant.merchant_id, { force: Boolean(req.body?.force) });
+      res.json(result);
     } catch (err) {
       next(err);
     }
