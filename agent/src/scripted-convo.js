@@ -22,5 +22,12 @@ const carousel = search.messages.find((message) => message.type === "product_car
 const product = carousel?.products?.[0];
 if (!product) throw new Error("search returned no product carousel");
 
-await chat({ kind: "action", action: "add_to_cart", product_id: product.product_id, quantity: 1 });
+await chat({
+  kind: "action",
+  action: "add_to_cart",
+  product_id: product.product_id,
+  quantity: 1,
+  size: product.attributes?.size?.[0],
+  color: product.attributes?.color?.[0],
+});
 await chat({ kind: "text", text: "I'm ready to check out" });

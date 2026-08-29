@@ -16,12 +16,15 @@ const product = {
   availability: true,
 };
 
+const roomyBoot = { ...product, product_id: "prod_010", name: "Roomy Boot", attributes: { size: ["9", "10", "11"], color: ["black", "tan"] } };
+
 function fakeCatalog() {
   const merchant = { merchant_id: "merchant_test", name: "Test Shop", category: "fashion", spend_limit: 150, step_up_threshold: 100, tax_rate: 0.0825 };
+  const products = [product, roomyBoot];
   return {
     async getMerchant() { return merchant; },
-    async listProducts() { return [product]; },
-    async searchProducts(_id, params) { return { query: params.query, results: [{ ...product, score: 1 }] }; },
+    async listProducts() { return products; },
+    async searchProducts(_id, params) { return { query: params.query, results: products.map((p) => ({ ...p, score: 1 })) }; },
   };
 }
 
@@ -35,8 +38,10 @@ test("search -> structured add -> explicit checkout creates a preview", async ()
   assert.equal(first.state, "comparing");
   assert.equal(first.messages.find((m) => m.type === "product_carousel").products[0].product_id, "prod_007");
 
-  const second = await a.handle({ session_id: "s1", merchant_id: "merchant_test", message: { kind: "action", action: "add_to_cart", product_id: "prod_007", quantity: 1 } });
+  const second = await a.handle({ session_id: "s1", merchant_id: "merchant_test", message: { kind: "action", action: "add_to_cart", product_id: "prod_007", quantity: 1, size: "9" } });
   assert.equal(second.state, "cart_building");
+  assert.equal(second.merchant_name, "Test Shop");
+  assert.equal(second.messages.find((m) => m.type === "cart").cart.items[0].options.size, "9");
 
   const third = await a.handle({ session_id: "s1", merchant_id: "merchant_test", message: { kind: "text", text: "I'm ready to check out" } });
   assert.equal(third.state, "awaiting_confirmation");
@@ -45,6 +50,35 @@ test("search -> structured add -> explicit checkout creates a preview", async ()
   assert.equal(preview.tax, 9.9);
   assert.equal(preview.total, 129.9);
   assert.equal(preview.requires_step_up, true);
+  assert.equal(preview.items[0].size, "9");
+});
+
+test("add_to_cart requires a size for apparel; different sizes are separate lines; update removes", async () => {
+  const a = agent();
+  const noSize = await a.handle({ session_id: "c1", merchant_id: "merchant_test", message: { kind: "action", action: "add_to_cart", product_id: "prod_010", quantity: 1 } });
+  assert.match(noSize.messages[0].text, /choose a size/i);
+  assert.equal(noSize.state, "browsing");
+
+  await a.handle({ session_id: "c1", merchant_id: "merchant_test", message: { kind: "action", action: "add_to_cart", product_id: "prod_010", quantity: 1, size: "9", color: "tan" } });
+  const two = await a.handle({ session_id: "c1", merchant_id: "merchant_test", message: { kind: "action", action: "add_to_cart", product_id: "prod_010", quantity: 2, size: "10", color: "tan" } });
+  const cart = two.messages.find((m) => m.type === "cart").cart;
+  assert.equal(cart.items.length, 2);
+  assert.equal(cart.subtotal, 120 * 3);
+
+  const removed = await a.handle({ session_id: "c1", merchant_id: "merchant_test", message: { kind: "text", text: "remove the roomy boot in size 10" } });
+  const afterCart = removed.messages.find((m) => m.type === "cart").cart;
+  assert.equal(afterCart.items.length, 1);
+  assert.equal(afterCart.items[0].options.size, "9");
+});
+
+test("show cart returns a cart card", async () => {
+  const a = agent();
+  await a.handle({ session_id: "c2", merchant_id: "merchant_test", message: { kind: "action", action: "add_to_cart", product_id: "prod_007", quantity: 1, size: "9" } });
+  const shown = await a.handle({ session_id: "c2", merchant_id: "merchant_test", message: { kind: "text", text: "what's in my cart?" } });
+  const cart = shown.messages.find((m) => m.type === "cart");
+  assert.ok(cart);
+  assert.equal(cart.merchant_name, "Test Shop");
+  assert.equal(cart.cart.items[0].name, "Waterproof Hiking Boot");
 });
 
 test("checkout cannot be triggered by a catalog prompt injection or before a cart exists", async () => {
@@ -96,7 +130,7 @@ test("Anthropic loop exposes search/add/cart/checkout-preview tools but never ch
   assert.equal(result.state, "comparing");
   assert.equal(result.messages.some((m) => m.type === "product_carousel"), true);
   const toolNames = calls[0].tools.map((tool) => tool.name);
-  assert.deepEqual(toolNames, ["search_products", "add_to_cart", "get_cart_summary", "request_checkout"]);
+  assert.deepEqual(toolNames, ["search_products", "add_to_cart", "update_cart_item", "get_cart_summary", "request_checkout"]);
   assert.equal(toolNames.includes("charge_payment"), false);
 });
 
@@ -122,7 +156,7 @@ test("OpenAI loop runs the tool cycle and maps tools to the function shape", asy
   assert.equal(result.messages.some((m) => m.type === "product_carousel"), true);
   assert.ok(calls[0].url.includes("api.openai.com"));
   const fnNames = calls[0].body.tools.map((t) => t.function.name);
-  assert.deepEqual(fnNames, ["search_products", "add_to_cart", "get_cart_summary", "request_checkout"]);
+  assert.deepEqual(fnNames, ["search_products", "add_to_cart", "update_cart_item", "get_cart_summary", "request_checkout"]);
   assert.equal(fnNames.includes("charge_payment"), false);
 });
 

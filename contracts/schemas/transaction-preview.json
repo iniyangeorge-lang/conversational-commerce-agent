@@ -17,7 +17,9 @@
         "properties": {
           "name": { "type": "string" },
           "qty": { "type": "integer", "minimum": 1 },
-          "price": { "type": "number", "minimum": 0 }
+          "price": { "type": "number", "minimum": 0 },
+          "size": { "type": "string" },
+          "color": { "type": "string" }
         }
       }
     },

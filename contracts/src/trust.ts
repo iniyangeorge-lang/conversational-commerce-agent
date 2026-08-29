@@ -12,7 +12,7 @@ import type { ChargeResponse, DeclineReason } from "./payments.js";
 export interface TransactionPreview {
   cart_id: string;
   merchant_name: string;
-  items: Array<{ name: string; qty: number; price: Money }>;
+  items: Array<{ name: string; qty: number; price: Money; size?: string; color?: string }>;
   subtotal: Money;
   tax: Money;
   total: Money;

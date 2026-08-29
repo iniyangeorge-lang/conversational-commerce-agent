@@ -71,7 +71,13 @@ function previewFor(session, items) {
   return {
     cart_id: session.cart.cart_id,
     merchant_name: session.merchant.name,
-    items: items.map((item) => ({ name: item.name, qty: item.quantity, price: item.unit_price })),
+    items: items.map((item) => ({
+      name: item.name,
+      qty: item.quantity,
+      price: item.unit_price,
+      ...(item.options?.size ? { size: item.options.size } : {}),
+      ...(item.options?.color ? { color: item.options.color } : {}),
+    })),
     subtotal,
     tax,
     total,
@@ -152,7 +158,13 @@ export class TrustLayer {
       const product = products.find((candidate) => candidate.product_id === item.product_id);
       if (!product || !product.availability || roundMoney(product.price) !== roundMoney(item.unit_price))
         return { changed: true };
-      items.push({ product_id: product.product_id, name: product.name, quantity: item.quantity, unit_price: roundMoney(product.price) });
+      items.push({
+        product_id: product.product_id,
+        name: product.name,
+        quantity: item.quantity,
+        unit_price: roundMoney(product.price),
+        ...(item.options ? { options: item.options } : {}),
+      });
     }
     return { changed: false, preview: previewFor(session, items), items };
   }

@@ -38,14 +38,17 @@ offline planner (used by demos and the unit tests). Set `AGENT_URL` and run
 }
 ```
 
-Product-card clicks use a structured action instead of free text:
+Product-card clicks use a structured action instead of free text. `size` is
+required for apparel that lists sizes; `color` is optional:
 
 ```json
 {
   "kind": "action",
   "action": "add_to_cart",
   "product_id": "prod_007",
-  "quantity": 1
+  "quantity": 1,
+  "size": "10",
+  "color": "black"
 }
 ```
 
@@ -76,9 +79,10 @@ Audit entries are stored in Postgres in `checkout_audit_log`.
 
 | Tool | Does |
 |---|---|
-| `search_products` | Search the merchant catalog (delegates to `@cca/catalog`). |
-| `add_to_cart` | Add `product_id` + `quantity` to the current order. |
-| `get_cart_summary` | Current cart contents + running total. |
+| `search_products` | Search the merchant catalog (delegates to `@cca/catalog`). Out-of-stock items are dropped. |
+| `add_to_cart` | Add `product_id` + `quantity` (+ `size`/`color`). Size is required for apparel; lines are keyed by product + size + colour. |
+| `update_cart_item` | Change a line's quantity, or remove it with `quantity: 0`. |
+| `get_cart_summary` | Current cart contents + subtotal. The UI renders it as a cart card. |
 | `request_checkout` | Trigger the trust layer to show a confirmation card. **Does NOT charge.** |
 
 **There is no `charge_payment` tool.** The `/mock-visa/charge` call lives in the

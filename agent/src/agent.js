@@ -25,6 +25,15 @@ function textMessage(text) {
   return { type: "text", text: String(text) };
 }
 
+function cartMessage(session) {
+  return {
+    type: "cart",
+    merchant_name: session.merchant?.name ?? "",
+    cart: session.cart,
+    subtotal: session.cart?.subtotal ?? 0,
+  };
+}
+
 export class CommerceAgent {
   constructor({ catalog = new CatalogClient(), store = new SessionStore(), offline = false, fetchImpl = fetch } = {}) {
     this.catalog = catalog;
@@ -51,6 +60,15 @@ export class CommerceAgent {
     await this.store.set(sessionKey(session.session_id), JSON.stringify(session));
   }
 
+  respond(session, messages) {
+    return {
+      session_id: session.session_id,
+      merchant_name: session.merchant?.name ?? "",
+      state: session.state,
+      messages,
+    };
+  }
+
   /** Which hosted model to drive, or null to use the offline planner. */
   llmProvider() {
     const forced = process.env.LLM_PROVIDER?.toLowerCase();
@@ -67,7 +85,12 @@ export class CommerceAgent {
     if (!request.message || typeof request.message !== "object") throw new Error("message is required");
     if (!["text", "action"].includes(request.message.kind)) throw new Error("message.kind must be text or action");
     if (request.message.kind === "text" && typeof request.message.text !== "string") throw new Error("message.text must be a string");
-    if (request.message.kind === "action" && request.message.action !== "add_to_cart") throw new Error("message.action must be add_to_cart");
+    if (request.message.kind === "action") {
+      if (request.message.action !== "add_to_cart") throw new Error("message.action must be add_to_cart");
+      for (const k of ["size", "color"])
+        if (request.message[k] !== undefined && typeof request.message[k] !== "string")
+          throw new Error(`message.${k} must be a string`);
+    }
 
     const session = await this.loadSession(request);
     if (request.message.kind === "text") {
@@ -79,7 +102,7 @@ export class CommerceAgent {
     if (!provider) {
       const result = await this.offlineTurn(session, request.message);
       await this.saveSession(session);
-      return { session_id: session.session_id, state: session.state, messages: result.messages };
+      return this.respond(session, result.messages);
     }
 
     try {
@@ -89,22 +112,32 @@ export class CommerceAgent {
           ? await this.runOpenAI(session)
           : await this.runModel(session);
       await this.saveSession(session);
-      return { session_id: session.session_id, state: session.state, messages: result.messages };
+      return this.respond(session, result.messages);
     } catch (err) {
       // A missing/invalid remote model must not make the storefront unusable.
       // The fallback uses the same server-side tools and safety checks.
       console.warn(`[agent] model loop unavailable (${err.message}) - using offline fallback`);
       const result = await this.offlineTurn(session, request.message);
       await this.saveSession(session);
-      return { session_id: session.session_id, state: session.state, messages: result.messages };
+      return this.respond(session, result.messages);
     }
   }
 
   async handleStructuredAction(session, message) {
-    const result = await this.executeTool("add_to_cart", { product_id: message.product_id, quantity: message.quantity }, session);
+    const result = await this.executeTool(
+      "add_to_cart",
+      { product_id: message.product_id, quantity: message.quantity, size: message.size, color: message.color },
+      session,
+    );
     if (!result.ok) return { messages: [textMessage(result.error.message)] };
-    const added = result.added;
-    return { messages: [textMessage(`Added ${added.quantity} × ${added.name} to your cart. Your subtotal is $${result.cart.subtotal.toFixed(2)}.`)] };
+    const a = result.added;
+    const opt = [a.size && `size ${a.size}`, a.color].filter(Boolean).join(", ");
+    return {
+      messages: [
+        textMessage(`Added ${a.quantity} × ${a.name}${opt ? ` (${opt})` : ""} — subtotal $${result.cart.subtotal.toFixed(2)}.`),
+        cartMessage(session),
+      ],
+    };
   }
 
   async offlineTurn(session, message) {
@@ -113,10 +146,36 @@ export class CommerceAgent {
     const lower = text.toLowerCase();
 
     if (/\b(cart|basket)\b/.test(lower) && !hasCheckoutIntent(text)) {
-      const items = session.cart.items.length
-        ? session.cart.items.map((item) => `${item.quantity} × ${item.name} ($${item.unit_price.toFixed(2)} each)`).join(", ")
-        : "Your cart is empty.";
-      return { messages: [textMessage(`${items} Subtotal: $${session.cart.subtotal.toFixed(2)}.`)] };
+      if (/\b(clear|empty|reset)\b/.test(lower)) {
+        session.cart.items = [];
+        session.cart.subtotal = 0;
+        session.state = "browsing";
+        session.checkout_preview = null;
+        session.checkout_result = null;
+        return { messages: [textMessage("Cleared your cart."), cartMessage(session)] };
+      }
+      return { messages: [cartMessage(session)] };
+    }
+
+    const removeMatch = lower.match(/\b(remove|delete|drop|take out)\b\s+(?:the\s+)?(.+)/);
+    if (removeMatch && session.cart.items.length) {
+      let term = removeMatch[2].trim().replace(/\bfrom (my |the )?(cart|bag)\b/, "").trim();
+      const wantedSize = term.match(/\bsize\s+(\S+)/)?.[1] ?? null;
+      const wantedColor = term.match(/\bin\s+(?!size\b)([a-z]+)\b/)?.[1] ?? null;
+      term = term.replace(/\b(in\s+)?size\s+\S+/g, "").replace(/\bin\s+(?!size\b)[a-z]+\b/g, "").trim();
+      const line = session.cart.items.find(
+        (item) =>
+          (item.product_id.toLowerCase() === term || (term && item.name.toLowerCase().includes(term))) &&
+          (!wantedSize || String(item.options?.size ?? "").toLowerCase() === wantedSize.toLowerCase()) &&
+          (!wantedColor || String(item.options?.color ?? "").toLowerCase() === wantedColor.toLowerCase()),
+      );
+      if (!line) return { messages: [textMessage(`I couldn't find "${removeMatch[2].trim()}" in your cart.`), cartMessage(session)] };
+      await this.executeTool(
+        "update_cart_item",
+        { product_id: line.product_id, size: line.options?.size, color: line.options?.color, quantity: 0 },
+        session,
+      );
+      return { messages: [textMessage(`Removed ${line.name} from your cart.`), cartMessage(session)] };
     }
 
     if (hasCheckoutIntent(text)) {
@@ -193,6 +252,7 @@ export class CommerceAgent {
       for (const call of calls) {
         const result = await this.executeTool(call.name, call.input ?? {}, session);
         if (call.name === "search_products" && result.ok) output.push({ type: "product_carousel", products: result.results });
+        if (["add_to_cart", "update_cart_item", "get_cart_summary"].includes(call.name) && result.ok) output.push(cartMessage(session));
         if (call.name === "request_checkout" && result.ok) output.push({ type: "transaction_preview", preview: result.preview });
         results.push({ type: "tool_result", tool_use_id: call.id, content: JSON.stringify(result) });
       }
@@ -254,9 +314,12 @@ export class CommerceAgent {
           args = {};
         }
         const result = await this.executeTool(call.function?.name, args, session);
-        if (call.function?.name === "search_products" && result.ok)
+        const fn = call.function?.name;
+        if (fn === "search_products" && result.ok)
           output.push({ type: "product_carousel", products: result.results });
-        if (call.function?.name === "request_checkout" && result.ok)
+        if (["add_to_cart", "update_cart_item", "get_cart_summary"].includes(fn) && result.ok)
+          output.push(cartMessage(session));
+        if (fn === "request_checkout" && result.ok)
           output.push({ type: "transaction_preview", preview: result.preview });
         messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
       }

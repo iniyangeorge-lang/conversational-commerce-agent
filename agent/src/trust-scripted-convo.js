@@ -25,7 +25,18 @@ const search = await post("/chat", {
 const product = search.messages.find((message) => message.type === "product_carousel")?.products?.[0];
 if (!product) throw new Error("search returned no product carousel");
 
-await post("/chat", { session_id, merchant_id, message: { kind: "action", action: "add_to_cart", product_id: product.product_id, quantity: 1 } });
+await post("/chat", {
+  session_id,
+  merchant_id,
+  message: {
+    kind: "action",
+    action: "add_to_cart",
+    product_id: product.product_id,
+    quantity: 1,
+    size: product.attributes?.size?.[0],
+    color: product.attributes?.color?.[0],
+  },
+});
 const checkout = await post("/chat", { session_id, merchant_id, message: { kind: "text", text: "I'm ready to check out" } });
 const preview = checkout.messages.find((message) => message.type === "transaction_preview")?.preview;
 if (!preview) throw new Error("checkout did not return a transaction preview");

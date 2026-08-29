@@ -2,12 +2,17 @@
 
 One continuous thread, no redirects, rich cards inline.
 
+The header shows the merchant name (`ChatResponse.merchant_name`).
+
 ## Message types
 
 1. **text** - plain agent/user text.
-2. **product_carousel** - image, name, price, "add to cart" (button sends a
-   structured action message, not free text).
-3. **transaction_preview** - the non-dismissible-by-chat confirm/cancel card.
+2. **product_carousel** - image, name, price, size/colour dropdowns, "Add to cart".
+   Only available products are shown. For apparel the button is disabled until a
+   size is picked; it sends a structured action (`size`/`colour` included), not free text.
+3. **cart** - itemized bag card (qty x name, chosen size/colour, subtotal). Shown
+   after add/remove and when the shopper asks to see their cart.
+4. **transaction_preview** - the non-dismissible-by-chat confirm/cancel card.
    Only clicking "Confirm & pay" calls `POST /checkout/confirm`. The agent
    cannot cause payment by generating text.
 
@@ -23,7 +28,7 @@ Serve `src/` from any static host, then include:
 ```html
 <script src="https://your-static-host/widget.js"
   data-merchant="merchant_123"
-  data-agent-url="http://localhost:4000"></script>
+  data-agent-url="http://localhost:4003"></script>
 ```
 
 The widget is self-contained in a Shadow DOM. It persists the displayed thread

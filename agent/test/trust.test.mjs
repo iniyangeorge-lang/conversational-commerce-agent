@@ -50,7 +50,7 @@ async function prepared(productId, quantity = 1) {
   const catalog = fakeCatalog();
   const agent = new CommerceAgent({ catalog, store, offline: true });
   await agent.handle({ session_id: `s_${productId}_${quantity}`, merchant_id: merchant.merchant_id, message: { kind: "text", text: products.find((p) => p.product_id === productId).name } });
-  await agent.handle({ session_id: `s_${productId}_${quantity}`, merchant_id: merchant.merchant_id, message: { kind: "action", action: "add_to_cart", product_id: productId, quantity } });
+  await agent.handle({ session_id: `s_${productId}_${quantity}`, merchant_id: merchant.merchant_id, message: { kind: "action", action: "add_to_cart", product_id: productId, quantity, size: "9", color: "black" } });
   const checkout = await agent.handle({ session_id: `s_${productId}_${quantity}`, merchant_id: merchant.merchant_id, message: { kind: "text", text: "check out" } });
   assert.equal(checkout.state, "awaiting_confirmation");
   const audit = new MemoryAuditRepository();
