@@ -1,0 +1,18 @@
+{
+  "name": "@cca/agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Conversational AI agent layer (Phase 4): discover, recommend, request checkout.",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "convo": "node src/scripted-convo.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cca/contracts": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

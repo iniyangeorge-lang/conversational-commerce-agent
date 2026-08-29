@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cca/payments/charge.response",
+  "title": "ChargeResponse",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "transaction_id", "auth_code"],
+      "properties": {
+        "status": { "const": "approved" },
+        "transaction_id": { "type": "string" },
+        "auth_code": { "type": "string" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "transaction_id", "decline_reason"],
+      "properties": {
+        "status": { "const": "declined" },
+        "transaction_id": { "type": "string" },
+        "decline_reason": {
+          "type": "string",
+          "enum": ["insufficient_funds", "card_declined", "expired_card", "suspected_fraud"]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "name": "conversational-commerce-agent",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Conversational Commerce Agent - Visa Challenge (monorepo)",
+  "workspaces": [
+    "contracts",
+    "agent",
+    "catalog",
+    "payments",
+    "frontend"
+  ],
+  "scripts": {
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev": "npm run dev --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0"
+  }
+}

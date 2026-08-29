@@ -1,0 +1,81 @@
+/**
+ * Catalog service contract (Phase 2 & 3).
+ *
+ * Everything a merchant provides is normalized into `Product`.
+ */
+
+import type { Currency, Money } from "./common.js";
+
+export type ProductCategory = "food" | "fashion" | "electronics" | "travel";
+
+export interface ProductAttributes {
+  /** Footwear demo: sizes the product is offered in, e.g. ["8", "9", "10"]. */
+  size?: string[];
+  /** Footwear demo: colorways the product is offered in. */
+  color?: string[];
+  /** Other categories layer their own keys (food: dietary/spice_level, etc.). */
+  [key: string]: unknown;
+}
+
+export interface Product {
+  product_id: string;
+  merchant_id: string;
+  name: string;
+  description: string;
+  price: Money;
+  currency: Currency;
+  category: ProductCategory;
+  image_url: string;
+  attributes: ProductAttributes;
+  availability: boolean;
+}
+
+export interface Merchant {
+  merchant_id: string;
+  name: string;
+  category: ProductCategory;
+  /** Phase 5: per-merchant spend cap and step-up threshold (demo defaults if unset). */
+  spend_limit: Money;
+  step_up_threshold: Money;
+  tax_rate: number; // e.g. 0.0825
+}
+
+// --- search_products (called by the agent as a tool, Phase 4) ---
+
+export interface SearchProductsFilters {
+  category?: ProductCategory;
+  max_price?: Money;
+  /** Match products offered in this size (footwear demo). */
+  size?: string;
+  /** Match products offered in this color (footwear demo). */
+  color?: string;
+  available_only?: boolean;
+}
+
+export interface SearchProductsParams {
+  query: string;
+  max_price?: Money;
+  filters?: SearchProductsFilters;
+}
+
+export interface RankedProduct extends Product {
+  /** Cosine similarity or blended relevance score, higher is better. */
+  score: number;
+}
+
+export interface SearchProductsResponse {
+  query: string;
+  results: RankedProduct[]; // top 5, ranked
+}
+
+// --- Onboarding: extract-from-text (Phase 2, step 2) ---
+
+export interface ExtractProductsRequest {
+  merchant_id: string;
+  category: ProductCategory;
+  raw_text: string;
+}
+
+export interface ExtractProductsResponse {
+  products: Omit<Product, "product_id">[];
+}

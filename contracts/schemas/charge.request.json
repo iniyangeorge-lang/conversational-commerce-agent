@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cca/payments/charge.request",
+  "title": "ChargeRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["payment_token", "amount", "currency", "merchant_id", "order_ref"],
+  "properties": {
+    "payment_token": { "type": "string", "pattern": "^vtk_" },
+    "amount": { "type": "number", "exclusiveMinimum": 0 },
+    "currency": { "type": "string", "enum": ["USD"] },
+    "merchant_id": { "type": "string" },
+    "order_ref": { "type": "string", "description": "Idempotency key" }
+  }
+}

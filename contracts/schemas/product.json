@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cca/catalog/product",
+  "title": "Product",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "product_id", "merchant_id", "name", "description", "price",
+    "currency", "category", "image_url", "attributes", "availability"
+  ],
+  "properties": {
+    "product_id": { "type": "string" },
+    "merchant_id": { "type": "string" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "price": { "type": "number", "minimum": 0 },
+    "currency": { "type": "string", "enum": ["USD"] },
+    "category": { "type": "string", "enum": ["food", "fashion", "electronics", "travel"] },
+    "image_url": { "type": "string", "format": "uri" },
+    "attributes": { "type": "object" },
+    "availability": { "type": "boolean" }
+  }
+}

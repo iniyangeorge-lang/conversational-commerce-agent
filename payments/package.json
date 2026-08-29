@@ -1,0 +1,17 @@
+{
+  "name": "@cca/payments",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Mock Visa payment service (Phase 1): tokenize + charge/decline + transactions.",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cca/contracts": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

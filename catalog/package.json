@@ -1,0 +1,18 @@
+{
+  "name": "@cca/catalog",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Merchant onboarding + normalized catalog + search/recommendation (Phases 2-3).",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "seed": "node src/seed.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cca/contracts": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

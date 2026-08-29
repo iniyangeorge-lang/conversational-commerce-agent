@@ -1,0 +1,8 @@
+{
+  "merchant_id": "merchant_123",
+  "name": "Sole & Stride",
+  "category": "fashion",
+  "spend_limit": 150.0,
+  "step_up_threshold": 100.0,
+  "tax_rate": 0.0825
+}

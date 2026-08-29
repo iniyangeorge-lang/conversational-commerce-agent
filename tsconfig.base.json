@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "types": ["node"],
+    // No baseUrl: these paths resolve relative to THIS file (TS >= 5.0 behaviour).
+    // Workspaces also resolve @cca/contracts via its package.json "exports"; this
+    // entry is a convenience for editors.
+    "paths": {
+      "@cca/contracts": ["./contracts/src/index.ts"]
+    }
+  }
+}
