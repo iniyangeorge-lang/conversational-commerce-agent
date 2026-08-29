@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Chat widget: one continuous thread with inline product + transaction-preview cards (Phase 6).",
   "scripts": {
-    "dev": "npx serve src -l 4173",
+    "dev": "node src/server.js",
     "test": "node --test"
   },
   "dependencies": {

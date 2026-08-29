@@ -40,6 +40,15 @@ function fail(res, status, code, message, details) {
 export function createApp(opts = {}) {
   const app = express();
   app.disable("x-powered-by");
+
+  // Allow the merchant dashboard (static page on another port) to call this API.
+  app.use((req, res, next) => {
+    res.set("access-control-allow-origin", "*");
+    res.set("access-control-allow-headers", "content-type");
+    if (req.method === "OPTIONS") return res.sendStatus(204);
+    next();
+  });
+
   app.use(express.json({ limit: "2mb" }));
   app.use(express.text({ type: ["text/csv", "text/plain"], limit: "2mb" }));
 

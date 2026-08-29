@@ -65,6 +65,15 @@ function toTransaction(row) {
 export function createApp() {
   const app = express();
   app.disable("x-powered-by");
+
+  // Allow the merchant dashboard (static page on another port) to read transactions.
+  app.use((req, res, next) => {
+    res.set("access-control-allow-origin", "*");
+    res.set("access-control-allow-headers", "content-type");
+    if (req.method === "OPTIONS") return res.sendStatus(204);
+    next();
+  });
+
   app.use(express.json());
 
   // Request log - method + path + status only. Never the body (tokenize carries

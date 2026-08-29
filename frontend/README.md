@@ -16,14 +16,26 @@ The header shows the merchant name (`ChatResponse.merchant_name`).
    Only clicking "Confirm & pay" calls `POST /checkout/confirm`. The agent
    cannot cause payment by generating text.
 
-## Also
+## Pages
 
-- Session persistence: reload mid-conversation, resume from Redis-backed state.
-- Embeddable widget: `<script src=".../widget.js" data-merchant="merchant_123">`
+| File | Route | What |
+|---|---|---|
+| `src/index.html` | `/` | storefront - copy + the chat widget |
+| `src/widget.js` | `/widget.js` | the embeddable widget itself (Shadow DOM, self-contained) |
+| `src/merchant.html` + `src/merchant.js` | `/merchant` | merchant dashboard |
+| `src/server.js` | - | zero-dependency static server (`npm run dev -w @cca/frontend`, `:4173`) |
 
-## Run and embed
+## Merchant dashboard
 
-Serve `src/` from any static host, then include:
+A thin read-through of the live services - no local mock state:
+
+- **Store & checkout settings** - name / category / tax rate / step-up threshold from `GET :4002/merchants/:id`
+- **Catalog** - the product list from `GET :4002/merchants/:id/products`, plus CSV import (`POST .../products/csv`)
+- **Orders** - transactions from `GET :4001/mock-visa/transactions/:merchant_id`
+
+Needs the catalog + payments services running (both now send permissive CORS headers).
+
+## Embed the widget elsewhere
 
 ```html
 <script src="https://your-static-host/widget.js"
@@ -31,12 +43,11 @@ Serve `src/` from any static host, then include:
   data-agent-url="http://localhost:4003"></script>
 ```
 
-The widget is self-contained in a Shadow DOM. It persists the displayed thread
-and a merchant-scoped session ID in `localStorage`; on reload it sends that ID
-back to the agent, which restores the authoritative conversation state from
-Redis. Product buttons send `message.kind: "action"`; only the checkout card's
-explicit Confirm & pay button calls the payment endpoints.
-  (a minimal iframe embed is enough for the demo).
+Self-contained in a Shadow DOM. Persists the thread + a merchant-scoped session ID
+in `localStorage`; on reload it sends that ID back to the agent, which restores the
+authoritative conversation state from Redis. Product buttons send
+`message.kind: "action"`; only the checkout card's Confirm & pay button calls the
+payment endpoints.
 
 ## DoD
 
