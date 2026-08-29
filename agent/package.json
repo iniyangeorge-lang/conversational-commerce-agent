@@ -6,7 +6,9 @@
   "description": "Conversational AI agent layer (Phase 4): discover, recommend, request checkout.",
   "scripts": {
     "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
     "convo": "node src/scripted-convo.js",
+    "test": "node --test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

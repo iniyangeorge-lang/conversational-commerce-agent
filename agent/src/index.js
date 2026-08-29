@@ -1,12 +1,35 @@
-// Phase 4 - AI agent layer.
-// Placeholder entrypoint created in Phase 0 scaffolding.
-//
-// Tools exposed to the LLM: search_products, add_to_cart, get_cart_summary, request_checkout.
-// NO charge_payment tool exists - request_checkout only produces a confirmation card.
-// State machine (Redis, per session):
-//   browsing -> comparing -> cart_building -> awaiting_confirmation -> paid | declined | abandoned
-// request_checkout is only valid from cart_building with a non-empty cart.
+// Phase 4 agent service entrypoint.
 
-const PORT = process.env.AGENT_PORT ?? 4003;
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createApp } from "./app.js";
+import { createDefaultAgent } from "./agent.js";
 
-console.log(`[agent] scaffold only - implement in Phase 4. Would listen on :${PORT}`);
+const here = path.dirname(fileURLToPath(import.meta.url));
+for (const candidate of [
+  path.resolve(here, "../../.env"),
+  path.resolve(process.cwd(), ".env"),
+]) {
+  try {
+    process.loadEnvFile(candidate);
+    break;
+  } catch {
+    /* no .env at this location - try the next one */
+  }
+}
+
+const port = Number(process.env.AGENT_PORT ?? 4003);
+const server = createApp(createDefaultAgent());
+server.listen(port, () => {
+  console.log(`[agent] service listening on :${port}`);
+  if (!process.env.ANTHROPIC_API_KEY)
+    console.warn("[agent] ANTHROPIC_API_KEY not set - using the offline planner");
+});
+
+function shutdown(signal) {
+  console.log(`[agent] ${signal} received - shutting down`);
+  server.close(() => process.exit(0));
+}
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
