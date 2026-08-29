@@ -34,8 +34,9 @@ export interface Merchant {
   merchant_id: string;
   name: string;
   category: ProductCategory;
-  /** Phase 5: per-merchant spend cap and step-up threshold (demo defaults if unset). */
+  /** Retained for compatibility; the spend cap is no longer enforced at checkout. */
   spend_limit: Money;
+  /** Phase 5: totals above this require step-up verification. */
   step_up_threshold: Money;
   tax_rate: number; // e.g. 0.0825
 }

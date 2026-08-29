@@ -15,11 +15,16 @@ npm run dev -w @cca/catalog
 npm run dev -w @cca/agent
 ```
 
-The agent listens on `http://localhost:4003`. Copy `.env.example` to `.env` to
-enable the Anthropic tool-calling loop. Without `ANTHROPIC_API_KEY`, the same
-server uses a deterministic offline planner, which is useful for local demos
-and tests. Set `AGENT_URL` and run `npm run convo -w @cca/agent` for the scripted
-search → select → add → checkout-preview flow.
+The agent listens on `http://localhost:4003`. Copy `.env.example` to `.env` and
+set a key to enable the tool-calling loop:
+
+- `OPENAI_API_KEY` + `LLM_MODEL=gpt-4o` → OpenAI Chat Completions
+- `ANTHROPIC_API_KEY` + `LLM_MODEL=claude-sonnet-5` → Anthropic Messages
+
+`LLM_PROVIDER` (`openai` | `anthropic`) forces one when both keys are present;
+otherwise it's auto-detected. With **no** key the server uses a deterministic
+offline planner (used by demos and the unit tests). Set `AGENT_URL` and run
+`npm run convo -w @cca/agent` for the scripted search → add → checkout-preview flow.
 
 ## HTTP API
 
@@ -57,7 +62,7 @@ the LLM never has access to them as tools:
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/checkout/payment-method` | Tokenize a card through the payments service; only the token and last-4 are stored in the session. |
-| POST | `/checkout/confirm` | Rebuild and validate the cart, enforce spend cap/step-up, then call mock Visa. |
+| POST | `/checkout/confirm` | Rebuild and validate the cart, enforce step-up, then call mock Visa. |
 | POST | `/checkout/cancel` | Cancel the pending confirmation and write a cancel audit entry. |
 | GET | `/checkout/audit/:session_id` | Inspect the demo audit trail. |
 

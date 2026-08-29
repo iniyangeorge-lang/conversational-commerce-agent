@@ -31,8 +31,12 @@ trust.migrate()
     const server = createApp(agent, trust);
     server.listen(port, () => {
       console.log(`[agent] service listening on :${port}`);
-      if (!process.env.ANTHROPIC_API_KEY)
-        console.warn("[agent] ANTHROPIC_API_KEY not set - using the offline planner");
+      const provider = agent.llmProvider();
+      console.log(
+        provider
+          ? `[agent] chat model: ${provider} (${process.env.LLM_MODEL ?? (provider === "openai" ? "gpt-4o" : "claude-sonnet-5")})`
+          : "[agent] no LLM key set - using the deterministic offline planner",
+      );
     });
 
     const shutdown = (signal) => {

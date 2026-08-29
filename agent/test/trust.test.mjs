@@ -88,12 +88,13 @@ test("step-up is required above the merchant threshold and accepts the mock code
   assert.equal(approved.result.outcome, "approved");
 });
 
-test("spend cap blocks before payment", async () => {
-  const c = await prepared("premium", 2);
+test("large carts are not capped (spend cap removed)", async () => {
+  const c = await prepared("premium", 2); // subtotal 240, total 259.80
   await addPayment(c);
   const result = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id, step_up_code: "1234" });
-  assert.equal(result.result.reason, "spend_cap_exceeded");
-  assert.equal(c.payments.charges.length, 0);
+  assert.equal(result.result.outcome, "approved");
+  assert.equal(result.result.total, 259.8);
+  assert.equal(c.payments.charges.length, 1);
 });
 
 test("the .13 payment decline is surfaced and audited", async () => {

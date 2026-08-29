@@ -58,7 +58,24 @@ test("checkout cannot be triggered by a catalog prompt injection or before a car
   assert.equal(premature.messages.some((m) => m.type === "transaction_preview"), false);
 });
 
-test("model loop exposes search/add/cart/checkout-preview tools but never charge_payment", async () => {
+function withEnv(vars, fn) {
+  const prev = {};
+  for (const [k, v] of Object.entries(vars)) {
+    prev[k] = process.env[k];
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+  return Promise.resolve()
+    .then(fn)
+    .finally(() => {
+      for (const [k, v] of Object.entries(prev)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    });
+}
+
+test("Anthropic loop exposes search/add/cart/checkout-preview tools but never charge_payment", async () => {
   const calls = [];
   const responses = [
     { content: [{ type: "tool_use", id: "tool_1", name: "search_products", input: { query: "boots" } }] },
@@ -68,25 +85,45 @@ test("model loop exposes search/add/cart/checkout-preview tools but never charge
     catalog: fakeCatalog(),
     store: new MemoryStore(),
     fetchImpl: async (_url, options) => {
-      const payload = JSON.parse(options.body);
-      calls.push(payload);
+      calls.push(JSON.parse(options.body));
       return { ok: true, async json() { return responses.shift(); } };
     },
   });
-  const previousKey = process.env.ANTHROPIC_API_KEY;
-  process.env.ANTHROPIC_API_KEY = "test-key";
-  let result;
-  try {
-    result = await a.handle({ session_id: "s4", merchant_id: "merchant_test", message: { kind: "text", text: "show me boots" } });
-  } finally {
-    if (previousKey === undefined) delete process.env.ANTHROPIC_API_KEY;
-    else process.env.ANTHROPIC_API_KEY = previousKey;
-  }
+  const result = await withEnv(
+    { LLM_PROVIDER: "anthropic", ANTHROPIC_API_KEY: "test-key", OPENAI_API_KEY: undefined },
+    () => a.handle({ session_id: "s4", merchant_id: "merchant_test", message: { kind: "text", text: "show me boots" } }),
+  );
   assert.equal(result.state, "comparing");
   assert.equal(result.messages.some((m) => m.type === "product_carousel"), true);
   const toolNames = calls[0].tools.map((tool) => tool.name);
   assert.deepEqual(toolNames, ["search_products", "add_to_cart", "get_cart_summary", "request_checkout"]);
   assert.equal(toolNames.includes("charge_payment"), false);
+});
+
+test("OpenAI loop runs the tool cycle and maps tools to the function shape", async () => {
+  const calls = [];
+  const responses = [
+    { choices: [{ message: { role: "assistant", content: null, tool_calls: [{ id: "call_1", type: "function", function: { name: "search_products", arguments: '{"query":"boots"}' } }] } }] },
+    { choices: [{ message: { role: "assistant", content: "Here is a boot you can add." } }] },
+  ];
+  const a = new CommerceAgent({
+    catalog: fakeCatalog(),
+    store: new MemoryStore(),
+    fetchImpl: async (url, options) => {
+      calls.push({ url, body: JSON.parse(options.body) });
+      return { ok: true, async json() { return responses.shift(); } };
+    },
+  });
+  const result = await withEnv(
+    { LLM_PROVIDER: "openai", OPENAI_API_KEY: "test-key", ANTHROPIC_API_KEY: undefined, LLM_MODEL: "gpt-4o" },
+    () => a.handle({ session_id: "o1", merchant_id: "merchant_test", message: { kind: "text", text: "show me boots" } }),
+  );
+  assert.equal(result.state, "comparing");
+  assert.equal(result.messages.some((m) => m.type === "product_carousel"), true);
+  assert.ok(calls[0].url.includes("api.openai.com"));
+  const fnNames = calls[0].body.tools.map((t) => t.function.name);
+  assert.deepEqual(fnNames, ["search_products", "add_to_cart", "get_cart_summary", "request_checkout"]);
+  assert.equal(fnNames.includes("charge_payment"), false);
 });
 
 test("HTTP transport serves /health and /chat", async () => {

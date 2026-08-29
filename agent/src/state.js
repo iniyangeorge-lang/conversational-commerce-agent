@@ -10,7 +10,8 @@ import net from "node:net";
 const SESSION_TTL_SECONDS = 60 * 60 * 24;
 
 function encodeCommand(parts) {
-  return `${parts.length}\r\n${parts.map((part) => `$${Buffer.byteLength(String(part))}\r\n${part}\r\n`).join("")}`;
+  // RESP array: *<count>\r\n then a bulk string ($<len>\r\n<data>\r\n) per part.
+  return `*${parts.length}\r\n${parts.map((part) => `$${Buffer.byteLength(String(part))}\r\n${part}\r\n`).join("")}`;
 }
 
 function tryDecode(buffer) {

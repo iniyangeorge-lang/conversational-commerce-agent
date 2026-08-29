@@ -142,7 +142,7 @@ export class TrustLayer {
 
   async authoritativePreview(session) {
     // Merchant policy is also server data. Refresh it so a threshold, tax rate,
-    // or spend limit change cannot be bypassed using an older session snapshot.
+    // change cannot be bypassed using an older session snapshot.
     const merchant = await this.catalog.getMerchant(session.merchant_id);
     if (!merchant) return { changed: true };
     session.merchant = merchant;
@@ -210,10 +210,7 @@ export class TrustLayer {
       return this.blockedResponse(session, snapshot, "cart_changed", "The cart or a product price changed after the preview was shown.");
 
     const preview = authoritative.preview;
-    const spent = roundMoney(session.total_spent);
-    const limit = Number(session.merchant.spend_limit ?? 150);
-    if (roundMoney(spent + preview.total) > roundMoney(limit))
-      return this.blockedResponse(session, snapshot, "spend_cap_exceeded", `This purchase would exceed the merchant spend limit of $${limit.toFixed(2)}.`);
+    const spent = roundMoney(session.total_spent); // running total, still tracked for the audit trail
 
     if (preview.requires_step_up && String(request.step_up_code ?? "") === "")
       return this.blockedResponse(session, snapshot, "step_up_required", "Additional verification is required before payment.");

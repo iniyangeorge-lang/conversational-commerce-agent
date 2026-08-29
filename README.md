@@ -5,7 +5,7 @@ conversation, with an **enforced** trust & consent layer around every payment.
 
 **Demo category:** footwear (Sole & Stride), modelled as the `fashion` category.
 Rich product cards, a natural size/color refinement turn, and price points that
-make the trust-layer paths (step-up, spend cap) easy to show on demand.
+make the trust-layer paths (step-up, decline) easy to show on demand.
 
 ---
 

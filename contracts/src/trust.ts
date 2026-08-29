@@ -44,7 +44,7 @@ export interface PaymentMethodTokenizeResponse {
 export type CheckoutConfirmResult =
   | { outcome: "approved"; transaction_id: string; auth_code: string; total: Money }
   | { outcome: "declined"; transaction_id: string; decline_reason: DeclineReason }
-  | { outcome: "blocked"; reason: "spend_cap_exceeded" | "step_up_required" | "step_up_invalid" | "cart_changed" | "checkout_not_pending" | "payment_method_required" | "payment_service_unavailable" | "catalog_unavailable"; message: string };
+  | { outcome: "blocked"; reason: "step_up_required" | "step_up_invalid" | "cart_changed" | "checkout_not_pending" | "payment_method_required" | "payment_service_unavailable" | "catalog_unavailable"; message: string };
 
 export interface CheckoutConfirmResponse {
   session_id: string;

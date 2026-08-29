@@ -11,8 +11,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { CATEGORIES, isCategory } from "./categories.js";
 import { normalizeProduct } from "./normalize.js";
 
-// Honours the project's LLM_MODEL (.env.example pins claude-sonnet-5).
-const MODEL = process.env.LLM_MODEL ?? "claude-sonnet-5";
+// Onboarding extraction always uses Anthropic (SDK). Its own env var so a
+// non-Claude LLM_MODEL (the agent may run on OpenAI) can't break this call.
+const MODEL = process.env.EXTRACT_MODEL ?? "claude-sonnet-5";
 
 const SYSTEM = `You extract structured product data from raw merchant text - a menu, a catalogue page, a price list.
 Identify every distinct purchasable product.

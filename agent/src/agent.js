@@ -1,5 +1,6 @@
-// Phase 4 conversational agent: Anthropic tool-calling loop plus an offline
-// deterministic fallback for local demos and tests without an API key.
+// Phase 4 conversational agent: an LLM tool-calling loop (OpenAI or Anthropic,
+// selected by LLM_PROVIDER / whichever key is set) plus an offline deterministic
+// fallback for local demos and tests without an API key.
 
 import { CatalogClient } from "./catalog-client.js";
 import { buildSystemPrompt } from "./prompt.js";
@@ -50,6 +51,15 @@ export class CommerceAgent {
     await this.store.set(sessionKey(session.session_id), JSON.stringify(session));
   }
 
+  /** Which hosted model to drive, or null to use the offline planner. */
+  llmProvider() {
+    const forced = process.env.LLM_PROVIDER?.toLowerCase();
+    if (forced === "openai" || forced === "anthropic") return forced;
+    if (process.env.OPENAI_API_KEY) return "openai";
+    if (process.env.ANTHROPIC_API_KEY) return "anthropic";
+    return null;
+  }
+
   async handle(request) {
     if (!request || typeof request !== "object") throw new Error("request must be an object");
     if (typeof request.session_id !== "string" || !request.session_id.trim()) throw new Error("session_id is required");
@@ -65,7 +75,8 @@ export class CommerceAgent {
       session.history.push({ role: "user", content: request.message.text });
     } else session.checkout_intent = false;
 
-    if (this.offline || !process.env.ANTHROPIC_API_KEY) {
+    const provider = this.offline ? null : this.llmProvider();
+    if (!provider) {
       const result = await this.offlineTurn(session, request.message);
       await this.saveSession(session);
       return { session_id: session.session_id, state: session.state, messages: result.messages };
@@ -74,7 +85,9 @@ export class CommerceAgent {
     try {
       const result = request.message.kind === "action"
         ? await this.handleStructuredAction(session, request.message)
-        : await this.runModel(session);
+        : provider === "openai"
+          ? await this.runOpenAI(session)
+          : await this.runModel(session);
       await this.saveSession(session);
       return { session_id: session.session_id, state: session.state, messages: result.messages };
     } catch (err) {
@@ -142,6 +155,7 @@ export class CommerceAgent {
     };
   }
 
+  // --- Anthropic tool-calling loop ---
   async runModel(session) {
     let messages = session.history.map((item) => ({ role: item.role, content: item.content }));
     const output = [];
@@ -183,6 +197,69 @@ export class CommerceAgent {
         results.push({ type: "tool_result", tool_use_id: call.id, content: JSON.stringify(result) });
       }
       messages.push({ role: "user", content: results });
+    }
+    throw new Error("tool loop exceeded its safety limit");
+  }
+
+  // --- OpenAI (Chat Completions) tool-calling loop ---
+  async runOpenAI(session) {
+    const asText = (content) => (typeof content === "string" ? content : JSON.stringify(content));
+    const messages = [
+      { role: "system", content: buildSystemPrompt(session) },
+      ...session.history.map((item) => ({ role: item.role, content: asText(item.content) })),
+    ];
+    const tools = TOOL_DEFINITIONS.map((tool) => ({
+      type: "function",
+      function: { name: tool.name, description: tool.description, parameters: tool.input_schema },
+    }));
+    const output = [];
+
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
+      const response = await this.fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: process.env.LLM_MODEL ?? "gpt-4o",
+          max_completion_tokens: 2000,
+          messages,
+          tools,
+          tool_choice: "auto",
+          parallel_tool_calls: false,
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body?.error?.message ?? `OpenAI request failed (${response.status})`);
+
+      const choice = body.choices?.[0]?.message;
+      if (!choice) throw new Error("OpenAI response contained no message");
+
+      const text = String(choice.content ?? "").trim();
+      if (text) output.push(textMessage(text));
+
+      const calls = Array.isArray(choice.tool_calls) ? choice.tool_calls : [];
+      if (!calls.length) {
+        session.history = [...session.history, { role: "assistant", content: text }];
+        return { messages: output.length ? output : [textMessage("How can I help you shop today?")] };
+      }
+
+      messages.push({ role: "assistant", content: choice.content ?? null, tool_calls: calls });
+      for (const call of calls) {
+        let args = {};
+        try {
+          args = JSON.parse(call.function?.arguments || "{}");
+        } catch {
+          args = {};
+        }
+        const result = await this.executeTool(call.function?.name, args, session);
+        if (call.function?.name === "search_products" && result.ok)
+          output.push({ type: "product_carousel", products: result.results });
+        if (call.function?.name === "request_checkout" && result.ok)
+          output.push({ type: "transaction_preview", preview: result.preview });
+        messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
+      }
     }
     throw new Error("tool loop exceeded its safety limit");
   }
