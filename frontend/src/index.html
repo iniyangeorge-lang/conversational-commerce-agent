@@ -7,8 +7,11 @@
   <style>
     body { margin: 0; font: 15px/1.5 system-ui, sans-serif; color: #1b2438; background: #eef1f6; }
     .page { max-width: 900px; margin: 0 auto; padding: 32px 20px 64px; }
+    header { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
     header h1 { margin: 0 0 4px; }
     header p { margin: 0 0 28px; color: #5a6478; }
+    .merchant-link { flex: none; padding: 8px 11px; border: 1px solid #cfd6e5; border-radius: 8px; color: #33466e; background: #fff; text-decoration: none; font-weight: 700; font-size: 13px; }
+    .merchant-link:hover { border-color: #5b55dc; color: #4f46e5; }
     .layout { display: grid; gap: 28px; grid-template-columns: 1fr; }
     @media (min-width: 760px) { .layout { grid-template-columns: 1fr auto; align-items: start; } }
     .copy { background: #fff; border: 1px solid #dfe3ec; border-radius: 14px; padding: 20px 22px; }
@@ -20,8 +23,11 @@
 <body>
   <div class="page">
     <header>
-      <h1>Sole &amp; Stride</h1>
-      <p>Chat-native storefront demo — discover, decide, and pay in one thread.</p>
+      <div>
+        <h1>Sole &amp; Stride</h1>
+        <p>Chat-native storefront demo — discover, decide, and pay in one thread.</p>
+      </div>
+      <a class="merchant-link" href="./merchant.html">Merchant dashboard →</a>
     </header>
 
     <div class="layout">
