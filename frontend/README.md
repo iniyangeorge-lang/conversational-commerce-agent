@@ -15,6 +15,22 @@ One continuous thread, no redirects, rich cards inline.
 
 - Session persistence: reload mid-conversation, resume from Redis-backed state.
 - Embeddable widget: `<script src=".../widget.js" data-merchant="merchant_123">`
+
+## Run and embed
+
+Serve `src/` from any static host, then include:
+
+```html
+<script src="https://your-static-host/widget.js"
+  data-merchant="merchant_123"
+  data-agent-url="http://localhost:4000"></script>
+```
+
+The widget is self-contained in a Shadow DOM. It persists the displayed thread
+and a merchant-scoped session ID in `localStorage`; on reload it sends that ID
+back to the agent, which restores the authoritative conversation state from
+Redis. Product buttons send `message.kind: "action"`; only the checkout card's
+explicit Confirm & pay button calls the payment endpoints.
   (a minimal iframe embed is enough for the demo).
 
 ## DoD

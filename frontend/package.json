@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Chat widget: one continuous thread with inline product + transaction-preview cards (Phase 6).",
   "scripts": {
-    "dev": "echo \"implement in Phase 6 (Vite recommended)\" && exit 0"
+    "dev": "npx serve src -l 4173",
+    "test": "node --test"
   },
   "dependencies": {
     "@cca/contracts": "*"
