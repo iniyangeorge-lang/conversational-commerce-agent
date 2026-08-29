@@ -1,4 +1,4 @@
-// HTTP client for the catalog service's Phase 3 API.
+// HTTP client for the catalog service (marketplace).
 
 const jsonHeaders = { "content-type": "application/json" };
 
@@ -14,8 +14,7 @@ export class CatalogClient {
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const message = body?.error?.message ?? `catalog request failed (${response.status})`;
-      throw new Error(message);
+      throw new Error(body?.error?.message ?? `catalog request failed (${response.status})`);
     }
     return body;
   }
@@ -25,15 +24,19 @@ export class CatalogClient {
     return body.merchant;
   }
 
-  async searchProducts(merchantId, params) {
-    return this.request(`/merchants/${encodeURIComponent(merchantId)}/search`, {
-      method: "POST",
-      body: JSON.stringify(params),
-    });
+  /** Marketplace search - spans every merchant; results carry merchant_id + merchant_name. */
+  async searchProducts(params) {
+    return this.request("/search", { method: "POST", body: JSON.stringify(params) });
   }
 
   async listProducts(merchantId) {
     const body = await this.request(`/merchants/${encodeURIComponent(merchantId)}/products`);
     return body.products ?? [];
+  }
+
+  /** One product, looked up within its merchant. Null if not found. */
+  async getProduct(merchantId, productId) {
+    const products = await this.listProducts(merchantId);
+    return products.find((p) => p.product_id === productId) ?? null;
   }
 }

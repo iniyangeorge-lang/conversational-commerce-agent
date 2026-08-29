@@ -1,11 +1,12 @@
 # Conversational Commerce Agent — Visa Challenge
 
-A chat-native storefront: shoppers discover, compare, and pay inside one
-conversation, with an **enforced** trust & consent layer around every payment.
+A chat-native **marketplace**: shoppers discover products across several
+independent merchants, build one cart, and pay inside a single conversation -
+with an **enforced** trust & consent layer around every payment.
 
-**Demo category:** footwear (Sole & Stride), modelled as the `fashion` category.
-Rich product cards, a natural size/color refinement turn, and price points that
-make the trust-layer paths (step-up, decline) easy to show on demand.
+**Demo data:** two footwear stores - **Sole & Stride** (8.25 % tax) and
+**Nimbus Athletics** (7 % tax) - so a cross-merchant cart, one "Confirm & pay",
+and a checkout that fans out into one card charge per merchant.
 
 ---
 
@@ -35,10 +36,10 @@ Requires Node 20+ and Docker. Nothing is committed to `.env`.
 |---|---|---|---|
 | `contracts/` | `@cca/contracts` | 0 | **Shared types + JSON schemas.** Single source of truth for every inter-service contract. |
 | `payments/` | `@cca/payments` | 1 | Mock Visa service: tokenize + charge/decline + transactions. Decline test cards. Idempotent on `order_ref`. |
-| `catalog/` | `@cca/catalog` | 2–3 | Merchant onboarding (CSV + extract-from-text), normalized catalog, `search_products`. |
-| `agent/` | `@cca/agent` | 4 (+5) | Conversational agent (function-calling), state machine, and the trust & consent code path (`POST /checkout/confirm`). |
-| `frontend/` | `@cca/frontend` | 6 | Chat widget: one thread, inline product + transaction-preview cards. |
-| `fixtures/` | — | 0 | Demo merchant (footwear) + 18 products (JSON + CSV). |
+| `catalog/` | `@cca/catalog` | 2–3 | Merchant onboarding (CSV + extract-from-text), normalized catalog, marketplace `search_products` (`POST /search`), merchant auth. |
+| `agent/` | `@cca/agent` | 4 (+5) | AI **shopping assistant**: progressive clarifying questions, a structured shopper profile, explainable recommendations, comparison, conversational cart control, an activity trail — plus the trust & consent code path (`POST /checkout/confirm` fans out per merchant). |
+| `frontend/` | `@cca/frontend` | 6 | Landing page + conversational-commerce widget (one thread: recommendation cards with match scores, comparison tables, quick-reply chips, a bag grouped by store, a grouped checkout card, toasts, a trust panel). Plus a merchant dashboard with an AI-readiness score. Shared design system in `theme.css`; no framework/build/font dependency. |
+| `fixtures/` | — | 0 | Two demo merchants + their products (CSV). |
 
 `docker-compose.yml` runs Postgres (`:5432`) and Redis (`:6379`).
 
@@ -46,13 +47,28 @@ Requires Node 20+ and Docker. Nothing is committed to `.env`.
 
 ## The one architectural rule
 
-The agent's toolset has **no** `charge_payment` function. It can only call
-`request_checkout`, which produces a confirmation card. The real
+The agent's toolset has **no** `charge_payment` / `purchase` function. It can only
+call `request_checkout`, which produces a confirmation card. The real
 `/mock-visa/charge` call lives in the trust layer and fires **only** when the
 user clicks "Confirm & pay" — never from an LLM tool call.
 
 Never cut: the non-skippable confirmation card, the tokenized payment mock, and
 the audit log.
+
+---
+
+## The four capabilities
+
+| Capability | Where |
+|---|---|
+| **AI agent layer** | `agent/src/tools.js` — 10 controlled tools: `save_shopper_profile`, `ask_clarifying_question`, `search_products`, `get_product`, `recommend_products`, `compare_products`, cart tools, `request_checkout`. Progressive questioning + a live `ShopperProfile` + explainable recs (`match` score, ✓ reasons, trade-offs) in `agent/src/prompt.js` / `agent.js`. |
+| **Merchant integration** | `catalog/` — signup, CSV upload, marketplace search. Dashboard (`frontend/src/merchant.*`) adds an **AI shopping readiness** score and a mock **Connect API** panel. |
+| **Seamless payment** | Entirely in-conversation. `agent/src/trust.js` → `payments/` mock Visa. Card is tokenised (PAN never stored, never shown to the model); one charge per merchant. |
+| **Trust, consent & transparency** | Server-authoritative totals; every recommended product re-validated against the live catalogue; `agent_activity[]` trail on every response; a **Trust & safety** panel in the widget; re-validation blocks a checkout whose cart or price changed after the preview; `checkout_audit_log` per attempt. |
+
+**Trust boundary:** the model proposes (products, quantities, reasons); the app
+disposes (existence, availability, price, totals). See `recommend_products` in
+`agent/src/tools.js` and `authoritativePreview` in `agent/src/trust.js`.
 
 ---
 

@@ -12,6 +12,7 @@
 import { randomBytes } from "node:crypto";
 import express from "express";
 import { classifyCard, roundMoney } from "./rules.js";
+import { bearerAuth } from "./auth.js";
 import { query } from "./db.js";
 
 const rand = (n) => randomBytes(n).toString("hex");
@@ -62,17 +63,27 @@ function toTransaction(row) {
   };
 }
 
-export function createApp() {
+/** @param {{ auth?: boolean }} [opts] - `opts.auth === false` skips the transaction-history token check (tests). */
+export function createApp(opts = {}) {
   const app = express();
   app.disable("x-powered-by");
 
   // Allow the merchant dashboard (static page on another port) to read transactions.
   app.use((req, res, next) => {
     res.set("access-control-allow-origin", "*");
-    res.set("access-control-allow-headers", "content-type");
+    res.set("access-control-allow-headers", "content-type, authorization");
     if (req.method === "OPTIONS") return res.sendStatus(204);
     next();
   });
+
+  // Transaction history is a merchant's revenue data - gate it behind their token.
+  const guardTransactions = (req, res, next) => {
+    if (opts.auth === false) return next();
+    const auth = bearerAuth(req);
+    if (!auth || auth.merchant_id !== req.params.merchant_id)
+      return fail(res, 403, "forbidden", "a merchant token for this merchant is required");
+    next();
+  };
 
   app.use(express.json());
 
@@ -199,7 +210,7 @@ export function createApp() {
   });
 
   // --- GET /mock-visa/transactions/:merchant_id -----------------------------
-  app.get("/mock-visa/transactions/:merchant_id", async (req, res, next) => {
+  app.get("/mock-visa/transactions/:merchant_id", guardTransactions, async (req, res, next) => {
     try {
       const { merchant_id } = req.params;
       const { rows } = await query(

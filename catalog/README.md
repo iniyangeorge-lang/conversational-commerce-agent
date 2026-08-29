@@ -19,25 +19,40 @@ Config: `CATALOG_PORT` (4002), `DATABASE_URL`, `ANTHROPIC_API_KEY` + `LLM_MODEL`
 
 ## Endpoints
 
+🔒 = needs `Authorization: Bearer <merchant token>` **for that merchant**. Everything
+else is open (the shopping agent calls the reads with no token).
+
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/health` | ok when the DB is reachable |
+| POST | `/auth/signup` | `{ email, password, name, category, tax_rate?, step_up_threshold? }` -> `201 { token, merchant }` (creates a new `m_…` merchant) |
+| POST | `/auth/login` | `{ email, password }` -> `{ token, merchant }` |
+| GET | `/auth/me` | 🔒 -> `{ email, merchant }` |
 | GET | `/categories` / `/categories/:category` | category templates |
-| POST | `/merchants` | `{ merchant_id, name, category, spend_limit?, step_up_threshold?, tax_rate? }` upsert |
+| POST | `/search` | **marketplace search** - spans every merchant; results carry `merchant_id` + `merchant_name`. Used by the agent. |
+| POST | `/merchants` | 🔒 update your own merchant config |
+| GET | `/merchants` | list all merchants |
 | GET | `/merchants/:merchant_id` | merchant + trust-layer config |
-| POST | `/merchants/:merchant_id/products/csv` | `text/csv` body (or `{ csv }`) -> `{ inserted, updated, errors }` |
-| POST | `/merchants/:merchant_id/products/extract` | `{ raw_text, category? }` -> `{ products, errors }` (LLM; **does not persist**) |
-| POST | `/merchants/:merchant_id/products` | `{ products: [...] }` -> normalize + upsert |
+| POST | `/merchants/:merchant_id/products/csv` | 🔒 `text/csv` body -> `{ inserted, updated, errors }` |
+| POST | `/merchants/:merchant_id/products/extract` | 🔒 `{ raw_text, category? }` -> `{ products, errors }` (LLM; **does not persist**) |
+| POST | `/merchants/:merchant_id/products` | 🔒 `{ products: [...] }` -> normalize + upsert |
 | GET | `/merchants/:merchant_id/products` | `{ count, products[] }` |
 | POST | `/merchants/:merchant_id/search` | `{ query, max_price?, filters? }` -> `{ query, results[] }` (Phase 3) |
 | POST | `/merchants/:merchant_id/embed` | `{ force? }` -> rebuild this merchant's embeddings |
+
+Auth = scrypt password hashing + a stateless HS256 JWT signed with `AUTH_SECRET`
+(the payments service verifies transaction-history requests with the same secret).
+`src/auth.js`. `createApp({ auth: false })` disables the guard for tests.
+`npm run seed` creates two stores + a login each:
+`demo@soleandstride.example` and `demo@nimbusathletics.example`, both `demo1234`.
 
 Contract shapes: `@cca/contracts` -> `src/catalog.ts`.
 
 ## Search (Phase 3)
 
-`searchProducts(merchant_id, { query, max_price?, filters? })` - the single function
-Phase 4 calls as a tool (also exposed as `POST .../search`).
+`searchProducts(merchant_id | null, { query, max_price?, filters? })`. The agent
+calls `POST /search` (merchant_id = null) so results span every store and each
+carries `merchant_id` + `merchant_name`. `POST /merchants/:id/search` scopes to one.
 
 - **Semantic rank**: cosine similarity of the query embedding vs each product's
   `name + description` embedding. Empty `query` -> filter-only browse, cheapest first.

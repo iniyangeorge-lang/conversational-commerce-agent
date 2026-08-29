@@ -46,6 +46,7 @@ async function onboard(category = "fashion") {
 before(async () => {
   await migrate();
   server = createApp({
+    auth: false,
     // stub the LLM: pretend the text described two shoes
     extractor: async () => [
       {

@@ -47,11 +47,12 @@ export function createApp(agent = createDefaultAgent(), trust = createDefaultTru
     if (req.method === "OPTIONS") return send(res, 204, {});
     if (req.method === "GET" && req.url === "/health") return send(res, 200, { status: "ok" });
     const isChat = req.method === "POST" && req.url === "/chat";
+    const isForget = req.method === "POST" && req.url === "/profile/forget";
     const isConfirm = req.method === "POST" && req.url === "/checkout/confirm";
     const isCancel = req.method === "POST" && req.url === "/checkout/cancel";
     const isPaymentMethod = req.method === "POST" && req.url === "/checkout/payment-method";
     const isAudit = req.method === "GET" && req.url.startsWith("/checkout/audit/");
-    if (!isChat && !isConfirm && !isCancel && !isPaymentMethod && !isAudit)
+    if (!isChat && !isForget && !isConfirm && !isCancel && !isPaymentMethod && !isAudit)
       return send(res, 404, { error: { code: "not_found", message: `no route for ${req.method} ${req.url}` } });
 
     try {
@@ -62,11 +63,13 @@ export function createApp(agent = createDefaultAgent(), trust = createDefaultTru
       const request = await readJson(req);
       const response = isChat
         ? await agent.handle(request)
-        : isConfirm
-          ? await trust.confirm(request)
-          : isCancel
-            ? await trust.cancel(request)
-            : await trust.tokenizePaymentMethod(request);
+        : isForget
+          ? await agent.forgetPreference(request)
+          : isConfirm
+            ? await trust.confirm(request)
+            : isCancel
+              ? await trust.cancel(request)
+              : await trust.tokenizePaymentMethod(request);
       return send(res, 200, response);
     } catch (err) {
       const status = err.status ?? (/request|message|session|merchant|card/.test(err.message) ? 422 : 500);

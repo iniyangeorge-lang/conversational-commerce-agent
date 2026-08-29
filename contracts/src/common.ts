@@ -10,7 +10,7 @@ export type Timestamp = string;
  *
  * Stored/transported as a float for hackathon speed. To avoid drift, every
  * server-side total and comparison MUST go through `roundMoney` first
- * (subtotal + tax, step-up threshold check, audit-log amounts).
+ * (per-merchant subtotal + tax, charge amounts, audit-log amounts).
  */
 export type Money = number;
 

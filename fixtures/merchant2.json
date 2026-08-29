@@ -1,0 +1,8 @@
+{
+  "merchant_id": "merchant_nimbus",
+  "name": "Nimbus Athletics",
+  "category": "fashion",
+  "spend_limit": 300.0,
+  "step_up_threshold": 150.0,
+  "tax_rate": 0.07
+}

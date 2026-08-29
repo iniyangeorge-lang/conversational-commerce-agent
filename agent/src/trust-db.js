@@ -21,13 +21,14 @@ export async function migrate() {
 export async function insertAudit(entry) {
   await pool.query(
     `INSERT INTO checkout_audit_log
-       (id, session_id, cart_id, cart_snapshot, amount_shown_to_user,
+       (id, session_id, cart_id, merchant_id, cart_snapshot, amount_shown_to_user,
         confirmation_action, charge_response, resulting_status, created_at)
-     VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7::jsonb, $8, $9)`,
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8::jsonb, $9, $10)`,
     [
       entry.id,
       entry.session_id,
       entry.cart_id,
+      entry.merchant_id ?? null,
       JSON.stringify(entry.cart_snapshot),
       entry.amount_shown_to_user,
       entry.confirmation_action,
@@ -47,6 +48,7 @@ export async function listAudit(sessionId) {
     id: row.id,
     session_id: row.session_id,
     cart_id: row.cart_id,
+    merchant_id: row.merchant_id ?? null,
     cart_snapshot: row.cart_snapshot,
     amount_shown_to_user: Number(row.amount_shown_to_user),
     confirmation_action: row.confirmation_action,

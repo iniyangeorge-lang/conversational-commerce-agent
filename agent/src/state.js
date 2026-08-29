@@ -155,19 +155,20 @@ export function sessionKey(sessionId) {
   return `cca:agent:session:${sessionId}`;
 }
 
-export function createSession(sessionId, merchantId, merchant) {
+export function createSession(sessionId) {
   return {
     session_id: sessionId,
-    merchant_id: merchantId,
-    merchant,
     state: "browsing",
     cart: {
       cart_id: `cart_${sessionId}`,
       session_id: sessionId,
-      merchant_id: merchantId,
-      items: [],
+      items: [], // each: { merchant_id, merchant_name, product_id, name, quantity, unit_price, options? }
       subtotal: 0,
     },
+    /** merchant_id -> { name, tax_rate, ... }, cached as items are added. */
+    merchants: {},
+    /** Structured shopper preference profile - see @cca/contracts ShopperProfile. */
+    profile: {},
     history: [],
     last_search: [],
     checkout_intent: false,

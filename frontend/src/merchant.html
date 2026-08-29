@@ -3,62 +3,157 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sole &amp; Stride — Merchant dashboard</title>
+  <meta name="theme-color" content="#5b4be6">
+  <title>Merchant dashboard</title>
+  <link rel="stylesheet" href="./theme.css">
   <style>
-    :root { --ink:#17223b; --muted:#65718a; --line:#e4e8f0; --bg:#f6f8fc; --brand:#4f46e5; --green:#138a63; --red:#c83d54; }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 ui-sans-serif, system-ui, sans-serif; }
-    .wrap { max-width: 960px; margin: 0 auto; padding: 32px 22px 64px; }
-    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
-    .eyebrow { font-size: 12px; font-weight: 800; color: var(--brand); letter-spacing: .08em; text-transform: uppercase; }
-    h1 { margin: 3px 0 0; font-size: 24px; letter-spacing: -.02em; }
-    a.back { color: #33466e; text-decoration: none; font-weight: 700; font-size: 13px; border: 1px solid var(--line); padding: 8px 11px; border-radius: 8px; background: #fff; white-space: nowrap; }
-    .card { padding: 20px; background: #fff; border: 1px solid var(--line); border-radius: 14px; margin-bottom: 18px; }
-    .card h2 { margin: 0; font-size: 16px; }
-    .sub { margin: 4px 0 0; color: var(--muted); }
-    .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-    .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-top: 16px; }
-    .kv b { display: block; font-size: 18px; letter-spacing: -.02em; }
-    .kv span { color: var(--muted); font-size: 12px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 14px; }
-    th, td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; vertical-align: top; }
-    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-    small { color: var(--muted); }
-    .badge { padding: 2px 7px; border-radius: 99px; font-size: 11px; font-weight: 800; }
-    .badge.ok { background: #eaf8f2; color: var(--green); }
-    .badge.no { background: #fdeef1; color: var(--red); }
-    button { border: 0; border-radius: 8px; padding: 9px 13px; font: 700 13px inherit; cursor: pointer; background: var(--brand); color: #fff; }
-    button.ghost { background: #eff1f7; color: #34415c; }
-    .drop { margin-top: 14px; padding: 22px; border: 2px dashed #bec7dd; border-radius: 12px; background: #fafbff; text-align: center; }
-    .drop.over { border-color: var(--brand); background: #f0efff; }
+    body { background:
+      radial-gradient(900px 420px at 100% -10%, #efe9ff 0%, rgba(239,233,255,0) 55%),
+      var(--c-bg); }
+    .wrap { max-width: 1000px; margin: 0 auto; padding: 30px 22px 72px; }
+
+    .top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+    .id { display: flex; align-items: center; gap: 13px; }
+    .avatar { width: 46px; height: 46px; border-radius: 13px; background-image: var(--grad-brand); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 17px; box-shadow: 0 10px 22px -10px rgba(91,75,230,.6); }
+    .eyebrow { font-size: 11.5px; font-weight: 800; color: var(--c-primary-strong); letter-spacing: .09em; text-transform: uppercase; }
+    h1 { font-size: 23px; margin: 1px 0 0; }
+    .top .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+    a.back { text-decoration: none; }
+
+    .card { padding: 22px; margin-bottom: 18px; }
+    .card > .row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .card h2 { font-size: 16.5px; }
+    .sub { margin: 4px 0 0; color: var(--c-text-2); font-size: 13.5px; }
+
+    .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 14px; }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 520px; }
+    th, td { padding: 11px 10px; border-bottom: 1px solid var(--c-border); text-align: left; font-size: 13px; vertical-align: top; }
+    thead th { color: var(--c-text-3); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; background: var(--c-surface-2); }
+    thead th:first-child { border-radius: var(--r-sm) 0 0 0; }
+    thead th:last-child { border-radius: 0 var(--r-sm) 0 0; }
+    tbody tr { transition: background var(--t) var(--ease); }
+    tbody tr:hover td { background: var(--c-primary-tint); }
+    small { color: var(--c-text-3); }
+    .muted { color: var(--c-text-3); }
+
+    button { border: 0; border-radius: var(--r-pill); padding: 10px 15px; font: 650 13px var(--font); cursor: pointer; background-image: var(--grad-brand); color: #fff; transition: transform var(--t-fast) var(--ease), box-shadow var(--t) var(--ease); box-shadow: 0 8px 20px -10px rgba(91,75,230,.55); }
+    button:hover { transform: translateY(-1px); box-shadow: 0 14px 28px -12px rgba(91,75,230,.6); }
+    button:active { transform: scale(.97); }
+    button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+    button.ghost { background: var(--c-surface); background-image: none; color: var(--c-text-2); border: 1px solid var(--c-border-strong); box-shadow: none; }
+    button.ghost:hover { background: var(--c-surface-2); color: var(--c-text); }
+    button.link { background: none; background-image: none; color: var(--c-primary-strong); padding: 0; box-shadow: none; text-decoration: underline; text-underline-offset: 3px; font-weight: 700; }
+    button.link:hover { transform: none; }
+
+    .drop { margin-top: 15px; padding: 24px; border: 2px dashed var(--c-border-strong); border-radius: var(--r-md); background: var(--c-surface-2); text-align: center; transition: border-color var(--t) var(--ease), background var(--t) var(--ease); }
+    .drop.over { border-color: var(--c-primary); background: var(--c-primary-soft); }
     .drop input { display: none; }
-    .note { margin-top: 12px; padding: 9px 12px; border-radius: 8px; background: #eefbf5; color: #087553; font-weight: 600; }
-    .note.err { background: #fff0f2; color: var(--red); }
-    .muted { color: var(--muted); }
+    .note { margin-top: 13px; padding: 10px 13px; border-radius: var(--r-sm); background: var(--c-success-soft); color: var(--c-success); font-weight: 600; font-size: 13px; }
+    .note.err { background: var(--c-error-soft); color: var(--c-error); }
+
+    .badge { padding: 3px 9px; border-radius: var(--r-pill); font-size: 11px; font-weight: 800; }
+    .badge.ok { background: var(--c-success-soft); color: var(--c-success); }
+    .badge.no { background: var(--c-error-soft); color: var(--c-error); }
+
+    .ready-head { display: flex; align-items: baseline; gap: 12px; margin-top: 4px; }
+    .ready-pct { font-size: 34px; font-weight: 850; letter-spacing: -.03em; background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .meter { height: 9px; border-radius: 6px; background: var(--c-surface-sunk); overflow: hidden; margin: 12px 0 4px; }
+    .meter i { display: block; height: 100%; width: 0; background-image: var(--grad-brand); border-radius: 6px; transition: width 700ms var(--ease); }
+    .dims { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 8px; }
+    .dims li { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; padding: 7px 11px; border-radius: var(--r-sm); background: var(--c-surface-2); }
+    .dims .s { font-weight: 800; }
+    .dims .s.ok { color: var(--c-success); }
+    .dims .s.warn { color: var(--c-warning); }
+
+    .field-row { display: grid; gap: 12px; grid-template-columns: 1fr; margin-top: 14px; }
+    @media (min-width: 640px) { .field-row { grid-template-columns: 2fr 1fr auto; align-items: end; } }
+
+    /* skeleton rows */
+    .sk { height: 12px; border-radius: 6px; }
+
+    [hidden] { display: none !important; }
+
+    /* auth */
+    .auth { max-width: 400px; margin: 9vh auto 0; }
+    .auth .brand { display: flex; align-items: center; gap: 11px; margin-bottom: 4px; }
+    .auth .brand .avatar { width: 40px; height: 40px; border-radius: 11px; font-size: 15px; }
+    .auth h1 { font-size: 22px; }
+    .auth .card { margin-top: 18px; padding: 24px; }
+    .auth .field { margin-bottom: 13px; }
+    .auth button[type=submit] { width: 100%; margin-top: 6px; padding: 12px; }
+    .auth-error { min-height: 16px; margin: 0 0 10px; color: var(--c-error); font-size: 12.5px; font-weight: 600; }
+    .auth-toggle { margin-top: 14px; text-align: center; font-size: 12.5px; color: var(--c-text-3); }
+    .demo-hint { text-align: center; margin-top: 16px; font-size: 12.5px; color: var(--c-text-3); }
+    .demo-hint code { background: var(--c-surface-2); padding: 2px 6px; border-radius: 5px; }
+
+    .toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+    .toast { display: flex; align-items: center; gap: 9px; background: #14152a; color: #fff; border-radius: var(--r-md); padding: 11px 14px; font: 600 13px var(--font); box-shadow: var(--sh-lg); animation: tin var(--t) var(--ease); }
+    .toast .ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; background: var(--c-success); }
+    .toast.err .ic { background: var(--c-error); }
+    @keyframes tin { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    @media (max-width: 560px) { .toasts { left: 12px; right: 12px; } }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="top">
-      <div><div class="eyebrow">Merchant dashboard</div><h1 id="store-name">Sole &amp; Stride</h1></div>
-      <a class="back" href="./index.html">← Storefront</a>
-    </div>
+  <!-- Auth gate -->
+  <section class="auth" id="auth">
+    <div class="brand"><span class="avatar" aria-hidden="true">M</span><div><div class="eyebrow">Merchant</div><h1 id="auth-title">Sign in</h1></div></div>
+    <form class="card" id="auth-form">
+      <p class="auth-error" id="auth-error" role="alert"></p>
+      <div class="field" id="name-field" hidden>
+        <label for="store-name-in">Store name</label>
+        <input id="store-name-in" autocomplete="organization">
+      </div>
+      <div class="field" id="category-field" hidden>
+        <label for="category-in">Category</label>
+        <select id="category-in">
+          <option value="fashion">Fashion &amp; footwear</option>
+          <option value="food">Food &amp; beverage</option>
+          <option value="electronics">Electronics</option>
+          <option value="travel">Travel</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="email-in">Email</label>
+        <input id="email-in" type="email" autocomplete="email" required>
+      </div>
+      <div class="field">
+        <label for="password-in">Password</label>
+        <input id="password-in" type="password" autocomplete="current-password" required minlength="8">
+      </div>
+      <button type="submit" id="auth-submit">Sign in</button>
+      <p class="auth-toggle">
+        <span id="auth-toggle-text">New store?</span>
+        <button type="button" class="link" id="auth-toggle">Create an account</button>
+      </p>
+    </form>
+    <p class="demo-hint">Demo login: <code>demo@soleandstride.example</code> / <code>demo1234</code></p>
+  </section>
 
-    <section class="card">
-      <h2>Store &amp; checkout settings</h2>
-      <p class="sub">Read-only here. Set at onboarding via the catalog service (<code>POST /merchants</code>).</p>
-      <div class="kv" id="settings"><span class="muted">Loading…</span></div>
-    </section>
+  <!-- Dashboard -->
+  <div class="wrap" id="dashboard" hidden>
+    <div class="top">
+      <div class="id">
+        <span class="avatar" id="store-avatar" aria-hidden="true">S</span>
+        <div><div class="eyebrow">Merchant dashboard</div><h1 id="store-name">Store</h1></div>
+      </div>
+      <div class="acts">
+        <a class="btn btn--ghost back" href="./index.html">← Storefront</a>
+        <button class="ghost" id="signout">Sign out</button>
+      </div>
+    </div>
 
     <section class="card">
       <div class="row">
         <div><h2>Catalog</h2><p class="sub" id="cat-sub">Products the shopping agent can search.</p></div>
         <button class="ghost" id="reload-cat">Refresh</button>
       </div>
-      <table>
-        <thead><tr><th>Product</th><th>Price</th><th>Category</th><th>Options</th><th>Available</th></tr></thead>
-        <tbody id="products"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
-      </table>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Product</th><th>Price</th><th>Category</th><th>Options</th><th>Available</th></tr></thead>
+          <tbody id="products"></tbody>
+        </table>
+      </div>
       <div class="drop" id="drop">
         <strong>Import products from CSV</strong><br>
         <span class="muted">Drop a file here, or</span>
@@ -70,15 +165,42 @@
 
     <section class="card">
       <div class="row">
+        <div><h2>AI shopping readiness</h2><p class="sub">How well your catalog is structured for the conversational agent.</p></div>
+        <button class="ghost" id="reload-ready">Recheck</button>
+      </div>
+      <div class="ready-head"><span class="ready-pct" id="ready-pct">—</span><span class="sub" id="ready-note">Checking…</span></div>
+      <div class="meter"><i id="ready-bar"></i></div>
+      <ul class="dims" id="ready-dims"></ul>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <div><h2>Connect a commerce API</h2><p class="sub">Already have a product API? Point us at it instead of uploading a CSV. (Demo — no real call is made.)</p></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label for="api-url">API endpoint</label><input id="api-url" placeholder="https://example.com/api/products"></div>
+        <div class="field"><label for="api-key">API key</label><input id="api-key" type="password" placeholder="•••••••••"></div>
+        <button id="api-test">Test connection</button>
+      </div>
+      <div id="api-note"></div>
+    </section>
+
+    <section class="card">
+      <div class="row">
         <div><h2>Orders</h2><p class="sub">Charges recorded by the mock Visa service.</p></div>
         <button class="ghost" id="reload-ord">Refresh</button>
       </div>
-      <table>
-        <thead><tr><th>Transaction</th><th>Amount</th><th>Status</th><th>Order ref</th><th>When</th></tr></thead>
-        <tbody id="orders"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
-      </table>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Transaction</th><th>Amount</th><th>Status</th><th>Order ref</th><th>When</th></tr></thead>
+          <tbody id="orders"></tbody>
+        </table>
+      </div>
     </section>
   </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
   <script src="./merchant.js"></script>
 </body>
 </html>

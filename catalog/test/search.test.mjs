@@ -34,7 +34,7 @@ before(async () => {
   await upsertProducts(products);
   await backfillEmbeddings(merchant_id);
 
-  server = createApp().listen(0);
+  server = createApp({ auth: false }).listen(0);
   await new Promise((r) => server.once("listening", r));
   base = `http://127.0.0.1:${server.address().port}`;
 });

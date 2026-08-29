@@ -4,28 +4,41 @@
   "title": "TransactionPreview",
   "type": "object",
   "additionalProperties": false,
-  "required": ["cart_id", "merchant_name", "items", "subtotal", "tax", "total", "requires_step_up"],
+  "required": ["cart_id", "groups", "subtotal", "tax", "total"],
   "properties": {
     "cart_id": { "type": "string" },
-    "merchant_name": { "type": "string" },
-    "items": {
+    "groups": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "qty", "price"],
+        "required": ["merchant_id", "merchant_name", "items", "subtotal", "tax", "total"],
         "properties": {
-          "name": { "type": "string" },
-          "qty": { "type": "integer", "minimum": 1 },
-          "price": { "type": "number", "minimum": 0 },
-          "size": { "type": "string" },
-          "color": { "type": "string" }
+          "merchant_id": { "type": "string" },
+          "merchant_name": { "type": "string" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "qty", "price"],
+              "properties": {
+                "name": { "type": "string" },
+                "qty": { "type": "integer", "minimum": 1 },
+                "price": { "type": "number", "minimum": 0 },
+                "size": { "type": "string" },
+                "color": { "type": "string" }
+              }
+            }
+          },
+          "subtotal": { "type": "number", "minimum": 0 },
+          "tax": { "type": "number", "minimum": 0 },
+          "total": { "type": "number", "minimum": 0 }
         }
       }
     },
     "subtotal": { "type": "number", "minimum": 0 },
     "tax": { "type": "number", "minimum": 0 },
-    "total": { "type": "number", "minimum": 0 },
-    "requires_step_up": { "type": "boolean" }
+    "total": { "type": "number", "minimum": 0 }
   }
 }

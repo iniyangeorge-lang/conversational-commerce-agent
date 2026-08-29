@@ -21,7 +21,7 @@ Config: `PAYMENTS_PORT` (default `4001`), `DATABASE_URL` (default
 |---|---|---|
 | POST | `/mock-visa/tokenize` | `{ card_number, user_ref }` -> `201 { payment_token, card_last4, created_at }`. The card number derives last-4 and is then discarded - never stored, never logged. |
 | POST | `/mock-visa/charge` | `{ payment_token, amount, currency, merchant_id, order_ref }` -> `200` approved or declined. Idempotent on `(merchant_id, order_ref)`. |
-| GET | `/mock-visa/transactions/:merchant_id` | `200 { merchant_id, transactions[] }`, newest first. |
+| GET | `/mock-visa/transactions/:merchant_id` | `200 { merchant_id, transactions[] }`, newest first. **Needs `Authorization: Bearer <merchant token>`** for that merchant (revenue data) - verified with the shared `AUTH_SECRET`; token is issued by the catalog service. `403` otherwise. |
 | GET | `/health` | `{ status: "ok" }` when the DB is reachable. |
 
 Contract shapes: `@cca/contracts` -> `src/payments.ts`.

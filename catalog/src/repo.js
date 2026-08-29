@@ -1,5 +1,6 @@
 // Database operations for merchants and products.
 
+import { randomBytes } from "node:crypto";
 import { query } from "./db.js";
 import { generateProductId } from "./normalize.js";
 
@@ -18,6 +19,7 @@ function toProduct(row) {
   return {
     product_id: row.product_id,
     merchant_id: row.merchant_id,
+    ...(row.merchant_name ? { merchant_name: row.merchant_name } : {}),
     name: row.name,
     description: row.description,
     price: Number(row.price),
@@ -55,6 +57,11 @@ export async function upsertMerchant(m) {
 export async function getMerchant(merchant_id) {
   const { rows } = await query(`SELECT * FROM merchants WHERE merchant_id = $1`, [merchant_id]);
   return rows[0] ? toMerchant(rows[0]) : null;
+}
+
+export async function listMerchants() {
+  const { rows } = await query(`SELECT * FROM merchants ORDER BY merchant_id`);
+  return rows.map(toMerchant);
 }
 
 /**
@@ -100,12 +107,33 @@ export async function upsertProducts(products) {
   return { inserted, updated };
 }
 
+/** One merchant's products, or - when `merchant_id` is null - every merchant's,
+ *  each row carrying its `merchant_name` (marketplace search). */
 export async function listProducts(merchant_id) {
-  const { rows } = await query(
-    `SELECT * FROM products WHERE merchant_id = $1 ORDER BY product_id`,
-    [merchant_id],
-  );
+  const { rows } = merchant_id
+    ? await query(`SELECT * FROM products WHERE merchant_id = $1 ORDER BY product_id`, [merchant_id])
+    : await query(
+        `SELECT p.*, m.name AS merchant_name
+         FROM products p JOIN merchants m ON m.merchant_id = p.merchant_id
+         ORDER BY p.merchant_id, p.product_id`,
+      );
   return rows.map(toProduct);
+}
+
+// --- Merchant users (dashboard auth) ---------------------------------
+
+export async function createMerchantUser({ merchant_id, email, password_hash }) {
+  const id = `mu_${randomBytes(8).toString("hex")}`;
+  await query(
+    `INSERT INTO merchant_users (id, merchant_id, email, password_hash) VALUES ($1, $2, $3, $4)`,
+    [id, merchant_id, email, password_hash],
+  );
+  return { id, merchant_id, email };
+}
+
+export async function getMerchantUser(email) {
+  const { rows } = await query(`SELECT * FROM merchant_users WHERE email = $1`, [email]);
+  return rows[0] ?? null;
 }
 
 // --- Phase 3: embeddings ------------------------------------------------
@@ -123,11 +151,13 @@ export async function upsertEmbedding({ merchant_id, product_id, model, dim, vec
   );
 }
 
-/** @returns {Promise<{ product_id: string, model: string, vector: number[] }[]>} */
+/** Embedding rows for one merchant, or all (`merchant_id` null). */
 export async function getEmbeddingRows(merchant_id) {
-  const { rows } = await query(
-    `SELECT product_id, model, vector FROM product_embeddings WHERE merchant_id = $1`,
-    [merchant_id],
-  );
+  const { rows } = merchant_id
+    ? await query(
+        `SELECT merchant_id, product_id, model, vector FROM product_embeddings WHERE merchant_id = $1`,
+        [merchant_id],
+      )
+    : await query(`SELECT merchant_id, product_id, model, vector FROM product_embeddings`);
   return rows;
 }

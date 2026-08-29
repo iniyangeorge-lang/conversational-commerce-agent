@@ -12,19 +12,24 @@
 //
 // Phase 3 adds search_products on top of this.
 
+import { randomBytes } from "node:crypto";
 import express from "express";
 import { CATEGORIES, CATEGORY_TEMPLATES, isCategory } from "./categories.js";
 import { parseProductsCsv } from "./csv.js";
 import { extractProducts } from "./extract.js";
 import { normalizeProduct } from "./normalize.js";
 import {
+  createMerchantUser,
   getMerchant,
+  getMerchantUser,
+  listMerchants,
   listProducts,
   upsertMerchant,
   upsertProducts,
 } from "./repo.js";
 import { backfillEmbeddings } from "./embeddings.js";
 import { searchProducts } from "./search.js";
+import { bearerAuth, hashPassword, signToken, verifyPassword } from "./auth.js";
 import { query } from "./db.js";
 
 function fail(res, status, code, message, details) {
@@ -34,17 +39,30 @@ function fail(res, status, code, message, details) {
 }
 
 /**
- * @param {{ extractor?: Function }} [opts] - `opts.extractor` overrides the LLM
- *        call in the extract path (used by tests).
+ * @param {{ extractor?: Function, auth?: boolean }} [opts]
+ *        `opts.extractor` overrides the LLM call in the extract path (tests).
+ *        `opts.auth === false` disables the merchant-token guard (tests).
  */
 export function createApp(opts = {}) {
   const app = express();
   app.disable("x-powered-by");
 
+  // Merchant-token guard for catalog writes. Shopper-facing reads stay open.
+  const requireMerchant = (req, res, next) => {
+    const auth = bearerAuth(req);
+    if (!auth) return fail(res, 401, "unauthenticated", "sign in as the merchant first");
+    const target = req.params.merchant_id ?? req.body?.merchant_id;
+    if (target && auth.merchant_id !== target)
+      return fail(res, 403, "forbidden", "this token is for a different merchant");
+    req.auth = auth;
+    next();
+  };
+  const guard = opts.auth === false ? (_req, _res, next) => next() : requireMerchant;
+
   // Allow the merchant dashboard (static page on another port) to call this API.
   app.use((req, res, next) => {
     res.set("access-control-allow-origin", "*");
-    res.set("access-control-allow-headers", "content-type");
+    res.set("access-control-allow-headers", "content-type, authorization");
     if (req.method === "OPTIONS") return res.sendStatus(204);
     next();
   });
@@ -71,6 +89,55 @@ export function createApp(opts = {}) {
     }
   });
 
+  // --- Merchant auth (dashboard) -----------------------------------------
+  app.post("/auth/signup", async (req, res, next) => {
+    try {
+      const b = req.body ?? {};
+      const e = {};
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(b.email ?? ""))) e.email = "a valid email is required";
+      if (typeof b.password !== "string" || b.password.length < 8) e.password = "at least 8 characters";
+      if (typeof b.name !== "string" || !b.name.trim()) e.name = "store name is required";
+      if (!isCategory(b.category)) e.category = `must be one of ${CATEGORIES.join(", ")}`;
+      if (Object.keys(e).length) return fail(res, 422, "invalid_request", "signup failed validation", e);
+
+      const email = b.email.toLowerCase();
+      if (await getMerchantUser(email)) return fail(res, 409, "email_taken", "that email is already registered");
+
+      const merchant = await upsertMerchant({
+        merchant_id: `m_${randomBytes(6).toString("hex")}`,
+        name: b.name.trim(),
+        category: b.category,
+        tax_rate: typeof b.tax_rate === "number" ? b.tax_rate : undefined,
+        step_up_threshold: typeof b.step_up_threshold === "number" ? b.step_up_threshold : undefined,
+      });
+      await createMerchantUser({ merchant_id: merchant.merchant_id, email, password_hash: hashPassword(b.password) });
+      res.status(201).json({ token: signToken({ merchant_id: merchant.merchant_id, email }), merchant });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.post("/auth/login", async (req, res, next) => {
+    try {
+      const email = String(req.body?.email ?? "").toLowerCase();
+      const user = await getMerchantUser(email);
+      if (!user || !verifyPassword(req.body?.password, user.password_hash))
+        return fail(res, 401, "invalid_credentials", "email or password is incorrect");
+      const merchant = await getMerchant(user.merchant_id);
+      res.json({ token: signToken({ merchant_id: user.merchant_id, email }), merchant });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get("/auth/me", guard, async (req, res, next) => {
+    try {
+      res.json({ email: req.auth?.email, merchant: await getMerchant(req.auth?.merchant_id) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   // --- Category templates ---------------------------------------------------
   app.get("/categories", (_req, res) => res.json({ categories: CATEGORY_TEMPLATES }));
 
@@ -82,7 +149,7 @@ export function createApp(opts = {}) {
   });
 
   // --- Merchant onboarding ------------------------------------------------
-  app.post("/merchants", async (req, res, next) => {
+  app.post("/merchants", guard, async (req, res, next) => {
     try {
       const b = req.body ?? {};
       const e = {};
@@ -102,6 +169,14 @@ export function createApp(opts = {}) {
     }
   });
 
+  app.get("/merchants", async (_req, res, next) => {
+    try {
+      res.json({ merchants: await listMerchants() });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   app.get("/merchants/:merchant_id", async (req, res, next) => {
     try {
       const merchant = await getMerchant(req.params.merchant_id);
@@ -113,7 +188,7 @@ export function createApp(opts = {}) {
   });
 
   // --- CSV upload path ---------------------------------------------------
-  app.post("/merchants/:merchant_id/products/csv", async (req, res, next) => {
+  app.post("/merchants/:merchant_id/products/csv", guard, async (req, res, next) => {
     try {
       const merchant = await getMerchant(req.params.merchant_id);
       if (!merchant) return fail(res, 404, "merchant_not_found", "onboard the merchant first");
@@ -135,7 +210,7 @@ export function createApp(opts = {}) {
   });
 
   // --- Paste-a-menu-and-extract path -----------------------------------
-  app.post("/merchants/:merchant_id/products/extract", async (req, res, next) => {
+  app.post("/merchants/:merchant_id/products/extract", guard, async (req, res, next) => {
     try {
       const merchant = await getMerchant(req.params.merchant_id);
       if (!merchant) return fail(res, 404, "merchant_not_found", "onboard the merchant first");
@@ -161,7 +236,7 @@ export function createApp(opts = {}) {
   });
 
   // --- Persist reviewed products ------------------------------------------
-  app.post("/merchants/:merchant_id/products", async (req, res, next) => {
+  app.post("/merchants/:merchant_id/products", guard, async (req, res, next) => {
     try {
       const merchant = await getMerchant(req.params.merchant_id);
       if (!merchant) return fail(res, 404, "merchant_not_found", "onboard the merchant first");
@@ -201,6 +276,21 @@ export function createApp(opts = {}) {
   });
 
   // --- Phase 3: search + embedding backfill -------------------------------
+
+  // Marketplace search: spans every merchant, results carry merchant_id + merchant_name.
+  app.post("/search", async (req, res, next) => {
+    try {
+      const b = req.body ?? {};
+      if (typeof b.query !== "string")
+        return fail(res, 422, "invalid_request", "query (string) is required; use \"\" to browse by filter only");
+      if (b.filters !== undefined && (typeof b.filters !== "object" || b.filters === null))
+        return fail(res, 422, "invalid_request", "filters must be an object");
+      res.json(await searchProducts(null, { query: b.query, max_price: b.max_price, filters: b.filters }));
+    } catch (err) {
+      next(err);
+    }
+  });
+
   app.post("/merchants/:merchant_id/search", async (req, res, next) => {
     try {
       const merchant = await getMerchant(req.params.merchant_id);

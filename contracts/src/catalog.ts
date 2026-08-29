@@ -34,11 +34,11 @@ export interface Merchant {
   merchant_id: string;
   name: string;
   category: ProductCategory;
-  /** Retained for compatibility; the spend cap is no longer enforced at checkout. */
+  /** Retained for compatibility; not enforced (no spend cap, no step-up). */
   spend_limit: Money;
-  /** Phase 5: totals above this require step-up verification. */
   step_up_threshold: Money;
-  tax_rate: number; // e.g. 0.0825
+  /** Applied to this merchant's slice of the cart at checkout, e.g. 0.0825. */
+  tax_rate: number;
 }
 
 // --- search_products (called by the agent as a tool, Phase 4) ---
@@ -67,6 +67,8 @@ export interface SearchProductsParams {
 export interface RankedProduct extends Product {
   /** Cosine similarity or blended relevance score, higher is better. */
   score: number;
+  /** Store the product belongs to (populated by the marketplace cross-merchant search). */
+  merchant_name?: string;
 }
 
 export interface SearchProductsResponse {

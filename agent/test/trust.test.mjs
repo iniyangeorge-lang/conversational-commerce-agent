@@ -1,3 +1,5 @@
+// Phase 5 trust layer - marketplace fan-out checkout.
+
 import test from "node:test";
 import assert from "node:assert/strict";
 import { CommerceAgent, MemoryStore } from "../src/agent.js";
@@ -6,36 +8,35 @@ import { sessionKey } from "../src/state.js";
 import { MemoryAuditRepository, TrustLayer } from "../src/trust.js";
 
 const loadSession = async (store, sessionId) => JSON.parse(await store.get(sessionKey(sessionId)));
-
-const merchant = {
-  merchant_id: "merchant_test",
-  name: "Test Shop",
-  category: "fashion",
-  spend_limit: 150,
-  step_up_threshold: 100,
-  tax_rate: 0.0825,
-};
-
-const products = [
-  { product_id: "cheap", merchant_id: merchant.merchant_id, name: "Everyday Shoe", description: "A comfortable shoe", price: 40, currency: "USD", category: "fashion", image_url: "https://example.com/cheap", attributes: { size: ["9"], color: ["black"] }, availability: true },
-  { product_id: "premium", merchant_id: merchant.merchant_id, name: "Premium Boot", description: "A premium boot", price: 120, currency: "USD", category: "fashion", image_url: "https://example.com/premium", attributes: { size: ["9"], color: ["black"] }, availability: true },
-];
-
 const DECLINE_CARD = "4000000000000002";
+
+const merchants = {
+  m_alpha: { merchant_id: "m_alpha", name: "Alpha Shoes", category: "fashion", tax_rate: 0.1, step_up_threshold: 100 },
+  m_beta: { merchant_id: "m_beta", name: "Beta Runners", category: "fashion", tax_rate: 0.05, step_up_threshold: 100 },
+};
+const products = [
+  { merchant_id: "m_alpha", product_id: "a_shoe", name: "Alpha Everyday", description: "shoe", price: 40, currency: "USD", category: "fashion", image_url: "", attributes: { size: ["9"], color: ["black"] }, availability: true },
+  { merchant_id: "m_alpha", product_id: "a_boot", name: "Alpha Boot", description: "boot", price: 120, currency: "USD", category: "fashion", image_url: "", attributes: { size: ["9"] }, availability: true },
+  { merchant_id: "m_beta", product_id: "b_run", name: "Beta Runner", description: "running shoe", price: 60, currency: "USD", category: "fashion", image_url: "", attributes: { size: ["9"], color: ["blue"] }, availability: true },
+  { merchant_id: "m_beta", product_id: "b_sock", name: "Beta Socks", description: "socks", price: 15, currency: "USD", category: "fashion", image_url: "", attributes: {}, availability: true },
+];
 
 function fakeCatalog() {
   return {
-    async getMerchant() { return merchant; },
-    async listProducts() { return products; },
-    async searchProducts(_id, params) {
-      const q = params.query.toLowerCase();
-      const results = products.filter((p) => !q || p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
-      return { query: params.query, results: results.map((p) => ({ ...p, score: 1 })) };
+    async getMerchant(id) { return merchants[id] ?? null; },
+    async listProducts(id) { return products.filter((p) => p.merchant_id === id); },
+    async getProduct(mid, pid) { return products.find((p) => p.merchant_id === mid && p.product_id === pid) ?? null; },
+    async searchProducts(params) {
+      const q = String(params.query ?? "").toLowerCase();
+      const results = products
+        .filter((p) => !q || p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q))
+        .map((p) => ({ ...p, merchant_name: merchants[p.merchant_id].name, score: 1 }));
+      return { query: params.query, results };
     },
   };
 }
 
-function fakePayments() {
+function fakePayments({ declineMerchants = [] } = {}) {
   const charges = [];
   const badTokens = new Set();
   return {
@@ -47,115 +48,160 @@ function fakePayments() {
     },
     async charge(request) {
       charges.push(request);
-      if (badTokens.has(request.payment_token))
-        return { status: "declined", transaction_id: `txn_${charges.length}`, decline_reason: "card_declined" };
-      return { status: "approved", transaction_id: `txn_${charges.length}`, auth_code: "00" };
+      const n = charges.length;
+      if (badTokens.has(request.payment_token) || declineMerchants.includes(request.merchant_id))
+        return { status: "declined", transaction_id: `txn_${n}`, decline_reason: "card_declined" };
+      return { status: "approved", transaction_id: `txn_${n}`, auth_code: "00" };
     },
   };
 }
 
-async function prepared(productId, quantity = 1) {
+/** cart: [{ merchant_id, product_id, size?, color?, qty? }] */
+async function prepared(cart, paymentsOpts) {
+  const sid = `s_${Math.random().toString(16).slice(2)}`;
   const store = new MemoryStore();
   const catalog = fakeCatalog();
   const agent = new CommerceAgent({ catalog, store, offline: true });
-  await agent.handle({ session_id: `s_${productId}_${quantity}`, merchant_id: merchant.merchant_id, message: { kind: "text", text: products.find((p) => p.product_id === productId).name } });
-  await agent.handle({ session_id: `s_${productId}_${quantity}`, merchant_id: merchant.merchant_id, message: { kind: "action", action: "add_to_cart", product_id: productId, quantity, size: "9", color: "black" } });
-  const checkout = await agent.handle({ session_id: `s_${productId}_${quantity}`, merchant_id: merchant.merchant_id, message: { kind: "text", text: "check out" } });
+
+  await agent.handle({ session_id: sid, message: { kind: "text", text: "hi" } });
+  for (const line of cart) {
+    const r = await agent.handle({
+      session_id: sid,
+      message: { kind: "action", action: "add_to_cart", merchant_id: line.merchant_id, product_id: line.product_id, quantity: line.qty ?? 1, size: line.size, color: line.color },
+    });
+    assert.equal(r.state, "cart_building", JSON.stringify(r.messages));
+  }
+  const checkout = await agent.handle({ session_id: sid, message: { kind: "text", text: "check out" } });
   assert.equal(checkout.state, "awaiting_confirmation");
+  const preview = checkout.messages.find((m) => m.type === "transaction_preview").preview;
+
   const audit = new MemoryAuditRepository();
-  const payments = fakePayments();
-  const trust = new TrustLayer({ store, catalog, payments, audit, expectedStepUpCode: "1234" });
-  return { agent, store, catalog, trust, payments, audit, session_id: `s_${productId}_${quantity}`, cart_id: checkout.messages.find((m) => m.type === "transaction_preview").preview.cart_id };
+  const payments = fakePayments(paymentsOpts);
+  const trust = new TrustLayer({ store, catalog, payments, audit });
+  return { agent, store, catalog, trust, payments, audit, session_id: sid, cart_id: preview.cart_id, preview };
 }
 
-async function addPayment(preparedCheckout, card_number = "4242424242424242") {
-  await preparedCheckout.trust.tokenizePaymentMethod({ session_id: preparedCheckout.session_id, card_number });
-}
+const addPayment = (c, card_number = "4242424242424242") =>
+  c.trust.tokenizePaymentMethod({ session_id: c.session_id, card_number });
 
-test("confirm recomputes the total, charges only after tokenization, and is idempotent", async () => {
-  const c = await prepared("cheap");
-  const missingPayment = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id });
-  assert.equal(missingPayment.result.outcome, "blocked");
-  assert.equal(missingPayment.result.reason, "payment_method_required");
+test("checkout fans out into one charge per merchant; approved cart is emptied; idempotent", async () => {
+  const c = await prepared([
+    { merchant_id: "m_alpha", product_id: "a_shoe", size: "9", color: "black" },
+    { merchant_id: "m_beta", product_id: "b_run", size: "9", color: "blue" },
+  ]);
+
+  const noPay = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id });
+  assert.equal(noPay.result.reason, "payment_method_required");
+
   await addPayment(c);
-  const approved = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id });
-  assert.deepEqual(approved.result, { outcome: "approved", transaction_id: "txn_1", auth_code: "00", total: 43.3 });
+  const done = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id });
+  assert.equal(done.result.outcome, "completed");
+  assert.equal(done.result.charges.length, 2);
+  assert.ok(done.result.charges.every((ch) => ch.outcome === "approved"));
+  assert.equal(c.payments.charges.length, 2);
+  // one order_ref per merchant
+  assert.equal(new Set(c.payments.charges.map((ch) => ch.merchant_id)).size, 2);
+  // 40*1.10 + 60*1.05 = 44 + 63 = 107
+  assert.equal(done.result.approved_total, 107);
+
   const replay = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id });
-  assert.deepEqual(replay.result, approved.result);
-  assert.equal(c.payments.charges.length, 1);
-  assert.equal((await c.audit.list(c.session_id)).length, 3);
+  assert.deepEqual(replay.result, done.result);
+  assert.equal(c.payments.charges.length, 2); // no re-charge
 
   const session = await loadSession(c.store, c.session_id);
   assert.equal(session.state, "paid");
   assert.equal(session.cart.items.length, 0);
-  assert.equal(session.cart.subtotal, 0);
+  assert.equal((await c.audit.list(c.session_id)).filter((a) => a.merchant_id).length, 2);
 });
 
-test("step-up is required above the merchant threshold and accepts the mock code", async () => {
-  const c = await prepared("premium");
-  await addPayment(c);
-  const required = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id });
-  assert.equal(required.result.reason, "step_up_required");
-  const invalid = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id, step_up_code: "0000" });
-  assert.equal(invalid.result.reason, "step_up_invalid");
-  const approved = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id, step_up_code: "1234" });
-  assert.equal(approved.result.outcome, "approved");
+test("grouped preview: per-merchant tax + a grand total", async () => {
+  const c = await prepared([
+    { merchant_id: "m_alpha", product_id: "a_shoe", size: "9", color: "black" },
+    { merchant_id: "m_beta", product_id: "b_sock" },
+  ]);
+  const g = c.preview.groups;
+  assert.equal(g.length, 2);
+  const alpha = g.find((x) => x.merchant_id === "m_alpha");
+  const beta = g.find((x) => x.merchant_id === "m_beta");
+  assert.equal(alpha.subtotal, 40);
+  assert.equal(alpha.tax, 4); // 10%
+  assert.equal(beta.tax, 0.75); // 5% of 15
+  assert.equal(c.preview.total, 40 + 4 + 15 + 0.75);
 });
 
-test("large carts are not capped (spend cap removed)", async () => {
-  const c = await prepared("premium", 2); // subtotal 240, total 259.80
-  await addPayment(c);
-  const result = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id, step_up_code: "1234" });
-  assert.equal(result.result.outcome, "approved");
-  assert.equal(result.result.total, 259.8);
-  assert.equal(c.payments.charges.length, 1);
-});
-
-test("a decline test card is surfaced and audited; cart is kept for a retry", async () => {
-  const c = await prepared("cheap");
+test("a declined card declines every merchant; cart kept for a retry", async () => {
+  const c = await prepared([
+    { merchant_id: "m_alpha", product_id: "a_shoe", size: "9", color: "black" },
+    { merchant_id: "m_beta", product_id: "b_run", size: "9", color: "blue" },
+  ]);
   await addPayment(c, DECLINE_CARD);
-  const result = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id });
-  assert.equal(result.result.outcome, "declined");
-  assert.equal(result.result.decline_reason, "card_declined");
-  assert.equal((await c.audit.list(c.session_id)).at(-1).resulting_status, "declined");
-  // a declined charge keeps the cart so the shopper can retry with another card
-  assert.equal((await loadSession(c.store, c.session_id)).cart.items.length, 1);
+  const done = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id });
+  assert.equal(done.result.outcome, "completed");
+  assert.ok(done.result.charges.every((ch) => ch.outcome === "declined"));
+  assert.equal(done.result.approved_total, 0);
+  assert.equal((await loadSession(c.store, c.session_id)).cart.items.length, 2);
 });
 
-test("cart price changes after preview are blocked", async () => {
-  const c = await prepared("cheap");
-  products.find((p) => p.product_id === "cheap").price = 41;
+test("partial: one merchant approves, the other declines - approved items go, declined stay", async () => {
+  const c = await prepared(
+    [
+      { merchant_id: "m_alpha", product_id: "a_shoe", size: "9", color: "black" },
+      { merchant_id: "m_beta", product_id: "b_run", size: "9", color: "blue" },
+    ],
+    { declineMerchants: ["m_beta"] },
+  );
   await addPayment(c);
-  const result = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id });
-  assert.equal(result.result.reason, "cart_changed");
-  products.find((p) => p.product_id === "cheap").price = 40;
+  const done = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id });
+  assert.equal(done.result.outcome, "completed");
+  const byM = Object.fromEntries(done.result.charges.map((ch) => [ch.merchant_id, ch.outcome]));
+  assert.equal(byM.m_alpha, "approved");
+  assert.equal(byM.m_beta, "declined");
+
+  const session = await loadSession(c.store, c.session_id);
+  assert.equal(session.state, "paid"); // some approved
+  assert.equal(session.cart.items.length, 1);
+  assert.equal(session.cart.items[0].merchant_id, "m_beta");
+});
+
+test("a price change after the preview blocks the whole checkout", async () => {
+  const c = await prepared([{ merchant_id: "m_alpha", product_id: "a_shoe", size: "9", color: "black" }]);
+  products.find((p) => p.product_id === "a_shoe").price = 41;
+  await addPayment(c);
+  const done = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id });
+  assert.equal(done.result.outcome, "blocked");
+  assert.equal(done.result.reason, "cart_changed");
+  assert.equal(c.payments.charges.length, 0);
+  products.find((p) => p.product_id === "a_shoe").price = 40;
 });
 
 test("cancel abandons the pending checkout and records a cancel audit", async () => {
-  const c = await prepared("cheap");
-  const result = await c.trust.cancel({ session_id: c.session_id, cart_id: c.cart_id });
-  assert.deepEqual(result.result, { outcome: "cancelled" });
+  const c = await prepared([{ merchant_id: "m_alpha", product_id: "a_shoe", size: "9", color: "black" }]);
+  const r = await c.trust.cancel({ session_id: c.session_id, cart_id: c.cart_id });
+  assert.deepEqual(r.result, { outcome: "cancelled" });
   assert.equal((await c.audit.list(c.session_id)).at(-1).confirmation_action, "cancel");
 });
 
-test("HTTP checkout endpoints keep the card flow separate from chat", async () => {
-  const c = await prepared("cheap");
+test("HTTP checkout: a client-supplied amount is ignored; server charges the real totals", async () => {
+  const c = await prepared([
+    { merchant_id: "m_alpha", product_id: "a_shoe", size: "9", color: "black" },
+    { merchant_id: "m_beta", product_id: "b_run", size: "9", color: "blue" },
+  ]);
   const server = createApp(c.agent, c.trust).listen(0);
-  await new Promise((resolve) => server.once("listening", resolve));
+  await new Promise((r) => server.once("listening", r));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const tokenized = await fetch(`${base}/checkout/payment-method`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
+
+  const tok = await fetch(`${base}/checkout/payment-method`, {
+    method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ session_id: c.session_id, card_number: "4242 4242 4242 4242" }),
   });
-  assert.equal(tokenized.status, 200);
-  assert.deepEqual(await tokenized.json(), { session_id: c.session_id, card_last4: "4242" });
-  const confirmed = await fetch(`${base}/checkout/confirm`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
+  assert.deepEqual(await tok.json(), { session_id: c.session_id, card_last4: "4242" });
+
+  const res = await fetch(`${base}/checkout/confirm`, {
+    method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ session_id: c.session_id, cart_id: c.cart_id, amount: 0.01 }),
   });
-  assert.equal(confirmed.status, 200);
-  assert.equal((await confirmed.json()).result.outcome, "approved");
-  await new Promise((resolve) => server.close(resolve));
+  const body = await res.json();
+  assert.equal(body.result.outcome, "completed");
+  assert.equal(body.result.approved_total, 107);
+  await new Promise((r) => server.close(r));
 });

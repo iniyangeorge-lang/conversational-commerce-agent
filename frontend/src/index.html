@@ -3,48 +3,180 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sole &amp; Stride — demo storefront</title>
+  <meta name="theme-color" content="#5b4be6">
+  <title>Marketplace — shop by conversation</title>
+  <link rel="stylesheet" href="./theme.css">
   <style>
-    body { margin: 0; font: 15px/1.5 system-ui, sans-serif; color: #1b2438; background: #eef1f6; }
-    .page { max-width: 900px; margin: 0 auto; padding: 32px 20px 64px; }
-    header { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
-    header h1 { margin: 0 0 4px; }
-    header p { margin: 0 0 28px; color: #5a6478; }
-    .merchant-link { flex: none; padding: 8px 11px; border: 1px solid #cfd6e5; border-radius: 8px; color: #33466e; background: #fff; text-decoration: none; font-weight: 700; font-size: 13px; }
-    .merchant-link:hover { border-color: #5b55dc; color: #4f46e5; }
-    .layout { display: grid; gap: 28px; grid-template-columns: 1fr; }
-    @media (min-width: 760px) { .layout { grid-template-columns: 1fr auto; align-items: start; } }
-    .copy { background: #fff; border: 1px solid #dfe3ec; border-radius: 14px; padding: 20px 22px; }
-    .copy h2 { margin-top: 0; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; color: #6b7590; }
-    code { background: #f0f2f7; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
-    ol { padding-left: 20px; margin: 0; } li { margin: 6px 0; }
+    body { overflow-x: hidden; }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 22px; }
+
+    /* header */
+    .site {
+      position: sticky; top: 0; z-index: 20;
+      backdrop-filter: saturate(1.4) blur(10px);
+      background: rgba(255,255,255,.72);
+      border-bottom: 1px solid var(--c-border);
+    }
+    .site .wrap { display: flex; align-items: center; justify-content: space-between; height: 66px; gap: 16px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -.02em; font-size: 17px; text-decoration: none; color: var(--c-text); }
+    .brand .mark { width: 30px; height: 30px; border-radius: 9px; background-image: var(--grad-brand); display: grid; place-items: center; color: #fff; box-shadow: 0 6px 16px -6px rgba(91,75,230,.6); }
+    .nav { display: flex; align-items: center; gap: 26px; }
+    .nav a { text-decoration: none; color: var(--c-text-2); font-weight: 600; font-size: 14px; position: relative; padding: 6px 0; transition: color var(--t) var(--ease); }
+    .nav a::after { content: ""; position: absolute; left: 0; right: 100%; bottom: 0; height: 2px; border-radius: 2px; background: var(--c-primary); transition: right var(--t) var(--ease); }
+    .nav a:hover { color: var(--c-text); }
+    .nav a:hover::after { right: 0; }
+    @media (max-width: 720px) { .nav .hide-sm { display: none; } }
+
+    /* hero */
+    .hero { position: relative; background: var(--grad-hero); padding: clamp(56px, 7vw, 104px) 0 clamp(48px, 6vw, 88px); overflow: hidden; }
+    .hero .wrap { position: relative; z-index: 2; max-width: 760px; }
+    .kicker { display: inline-flex; align-items: center; gap: 8px; padding: 6px 13px; border-radius: var(--r-pill); background: rgba(255,255,255,.7); border: 1px solid var(--c-border); font-weight: 700; font-size: 12.5px; color: var(--c-primary-strong); letter-spacing: .01em; }
+    .kicker .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c-accent); }
+    .hero h1 { margin: 20px 0 0; }
+    .hero h1 .grad { background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .hero p.lead { margin: 18px 0 0; font-size: clamp(1rem, .95rem + .4vw, 1.2rem); color: var(--c-text-2); max-width: 34em; }
+    .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+    .trust-line { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--c-text-3); }
+    .trust-line span { display: inline-flex; align-items: center; gap: 6px; }
+    .trust-line svg { width: 15px; height: 15px; color: var(--c-success); }
+
+    .float { position: absolute; z-index: 1; border-radius: var(--r-md); background: var(--c-surface); box-shadow: var(--sh-lg); border: 1px solid var(--c-border); padding: 12px 14px; display: flex; gap: 10px; align-items: center; font-weight: 700; font-size: 13px; }
+    .float .em { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: var(--c-primary-soft); font-size: 18px; }
+    .float small { display: block; color: var(--c-text-3); font-weight: 600; }
+    .float.f1 { top: 12%;  right: 6%;  animation: bob 6s var(--ease) infinite; }
+    .float.f2 { top: 52%;  right: 15%; animation: bob 7s var(--ease) infinite reverse; }
+    .float.f3 { top: 78%;  right: 3%;  animation: bob 5.5s var(--ease) infinite; }
+    @media (max-width: 900px) { .float { display: none; } }
+    @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+
+    /* steps */
+    .steps { padding: clamp(44px, 6vw, 80px) 0; }
+    .steps .grid { display: grid; gap: 18px; grid-template-columns: repeat(3, 1fr); }
+    @media (max-width: 780px) { .steps .grid { grid-template-columns: 1fr; } }
+    .step { padding: 24px; }
+    .step .ico { width: 44px; height: 44px; border-radius: 12px; background: var(--c-primary-soft); color: var(--c-primary-strong); display: grid; place-items: center; margin-bottom: 14px; }
+    .step .ico svg { width: 22px; height: 22px; }
+    .step h3 { font-size: 17px; }
+    .step p { margin-top: 6px; color: var(--c-text-2); font-size: 14px; }
+    .step .n { float: right; font-weight: 800; color: var(--c-border-strong); font-size: 15px; }
+
+    /* assistant */
+    .assistant { padding: clamp(20px, 4vw, 40px) 0 clamp(56px, 8vw, 96px); }
+    .assistant .head { max-width: 620px; margin-bottom: 22px; }
+    .assistant .head h2 .grad { background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .assistant .head p { margin-top: 10px; color: var(--c-text-2); }
+    .widget-frame {
+      background: linear-gradient(180deg, #fff 0%, var(--c-primary-tint) 100%);
+      border: 1px solid var(--c-border);
+      border-radius: var(--r-xl);
+      padding: clamp(14px, 2.5vw, 26px);
+      box-shadow: var(--sh-lg);
+    }
+
+    footer { border-top: 1px solid var(--c-border); background: var(--c-surface); padding: 30px 0; }
+    footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; align-items: center; color: var(--c-text-3); font-size: 13px; }
+    footer a { color: var(--c-text-2); text-decoration: none; font-weight: 600; }
+    footer a:hover { color: var(--c-text); }
   </style>
 </head>
 <body>
-  <div class="page">
-    <header>
-      <div>
-        <h1>Sole &amp; Stride</h1>
-        <p>Chat-native storefront demo — discover, decide, and pay in one thread.</p>
-      </div>
-      <a class="merchant-link" href="./merchant.html">Merchant dashboard →</a>
-    </header>
-
-    <div class="copy">
-      <h2>Try it</h2>
-      <ol>
-        <li>Type <code>waterproof boots for winter under $150</code></li>
-        <li>Pick a size on a product card, then <b>Add to cart</b> — the bag on the right updates</li>
-        <li>Click <b>Checkout</b> in the bag (or say <code>I'm ready to check out</code>)</li>
-        <li>On the checkout card: any 16-digit number (e.g. <code>4242 4242 4242 4242</code>), code <code>1234</code> if asked, then <b>Confirm &amp; pay</b></li>
-      </ol>
-      <p style="color:#6b7590">Decline path: pay with card <code>4000 0000 0000 0002</code>.</p>
+  <header class="site">
+    <div class="wrap">
+      <a class="brand" href="./index.html">
+        <span class="mark" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 8h16l-1.4 9.3a2 2 0 0 1-2 1.7H7.4a2 2 0 0 1-2-1.7L4 8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </span>
+        Marketplace
+      </a>
+      <nav class="nav">
+        <a class="hide-sm" href="#how">How it works</a>
+        <a class="hide-sm" href="#assistant">Shop</a>
+        <a class="btn btn--ghost" href="./merchant.html">For merchants</a>
+      </nav>
     </div>
+  </header>
 
-    <!-- The widget injects itself immediately after this script tag. -->
-    <script src="./widget.js"
-            data-merchant="merchant_123"
-            data-agent-url="http://localhost:4003"></script>
-  </div>
+  <main>
+    <section class="hero">
+      <div class="wrap reveal">
+        <span class="kicker"><span class="dot"></span> Conversational commerce</span>
+        <h1>Shop the whole marketplace<br>by just <span class="grad">talking</span>.</h1>
+        <p class="lead">Tell the assistant what you need and your budget. It asks the right questions, searches every store, compares the options, and checks you out — all in one thread.</p>
+        <div class="cta">
+          <a class="btn btn--primary btn--lg" href="#assistant">Start shopping</a>
+          <a class="btn btn--ghost btn--lg" href="./merchant.html">Browse for merchants →</a>
+        </div>
+        <div class="trust-line">
+          <span><svg viewBox="0 0 24 24" fill="none"><path d="m5 13 4 4L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> No redirects — pay in the chat</span>
+          <span><svg viewBox="0 0 24 24" fill="none"><path d="m5 13 4 4L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> The assistant can't charge without your confirmation</span>
+        </div>
+      </div>
+
+      <div class="float f1" aria-hidden="true"><span class="em">👟</span><span>Nimbus Glide 12<small>Match 10/10</small></span></div>
+      <div class="float f2" aria-hidden="true"><span class="em">🥾</span><span>Waterproof Boot<small>$159 · in your budget</small></span></div>
+      <div class="float f3" aria-hidden="true"><span class="em">✅</span><span>Payment approved<small>2 stores · one checkout</small></span></div>
+    </section>
+
+    <section class="steps" id="how">
+      <div class="wrap">
+        <div class="grid">
+          <article class="card step reveal">
+            <span class="n">01</span>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h10M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+            <h3>Describe it</h3>
+            <p>“Cushioned road-running shoes under $140, size 10.” The assistant fills in the gaps with quick questions — not a form.</p>
+          </article>
+          <article class="card step reveal">
+            <span class="n">02</span>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M9 4v16M15 4v16M4 9h16M4 15h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+            <h3>Compare the picks</h3>
+            <p>A short, explained shortlist with a match score and the honest trade-offs — plus side-by-side tables on request.</p>
+          </article>
+          <article class="card step reveal">
+            <span class="n">03</span>
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m8.5 13 2.5 2.5 4.5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <h3>Check out once</h3>
+            <p>Review the exact order, authorise it yourself, and each store is charged separately behind one “Confirm &amp; pay”.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="assistant" id="assistant">
+      <div class="wrap">
+        <div class="head reveal">
+          <h2>Your <span class="grad">personal shopper</span></h2>
+          <p>Start with what you're looking for and roughly your budget. Everything below happens in one conversation.</p>
+        </div>
+        <div class="widget-frame reveal">
+          <!-- The widget injects itself immediately after this script tag. -->
+          <script src="./widget.js" data-agent-url="http://localhost:4003"></script>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>Conversational Commerce Agent — Visa Challenge demo</span>
+      <span><a href="./merchant.html">Merchant dashboard</a></span>
+    </div>
+  </footer>
+
+  <script>
+    (() => {
+      const els = document.querySelectorAll(".reveal");
+      if (!("IntersectionObserver" in window) || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        els.forEach((e) => e.classList.add("in"));
+        return;
+      }
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) { entry.target.classList.add("in"); io.unobserve(entry.target); }
+        });
+      }, { threshold: 0.12, rootMargin: "0px 0px -40px 0px" });
+      els.forEach((e) => io.observe(e));
+    })();
+  </script>
 </body>
 </html>

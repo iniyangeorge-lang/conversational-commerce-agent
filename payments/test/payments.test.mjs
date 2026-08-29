@@ -27,7 +27,7 @@ const tokenize = () =>
 
 before(async () => {
   await migrate();
-  server = createApp().listen(0);
+  server = createApp({ auth: false }).listen(0);
   await new Promise((resolve) => server.once("listening", resolve));
   base = `http://127.0.0.1:${server.address().port}`;
 });

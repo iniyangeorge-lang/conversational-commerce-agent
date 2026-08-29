@@ -14,9 +14,10 @@
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
     "infra:logs": "docker compose logs -f",
+    "setup": "npm run migrate -w @cca/catalog && npm run migrate -w @cca/payments && npm run seed -w @cca/catalog",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "dev": "npm run dev --workspaces --if-present"
+    "dev": "bash scripts/dev.sh"
   },
   "engines": {
     "node": ">=20"

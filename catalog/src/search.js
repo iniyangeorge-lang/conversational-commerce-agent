@@ -6,6 +6,9 @@
 //
 // Semantic similarity over name+description embeddings, then hard filters
 // (category, price ceiling, attribute-contains, availability). Top 5, ranked.
+//
+// `merchant_id` may be null - the marketplace search spans every merchant, and
+// each result carries its `merchant_id` + `merchant_name`.
 
 import { cosine, getEmbedder } from "./embedder.js";
 import { backfillEmbeddings } from "./embeddings.js";
@@ -13,6 +16,7 @@ import { getEmbeddingRows, listProducts } from "./repo.js";
 
 const TOP_N = 5;
 const ATTR_FILTER_KEYS = ["size", "color", "dietary", "material"];
+const vecKey = (p) => `${p.merchant_id} ${p.product_id}`;
 
 function toList(v) {
   if (Array.isArray(v)) return v.map((x) => String(x).toLowerCase());
@@ -33,7 +37,7 @@ function passesFilters(product, ctx) {
 }
 
 /**
- * @param {string} merchant_id
+ * @param {string|null} merchant_id  scope to one merchant, or null for the marketplace
  * @param {import("@cca/contracts").SearchProductsParams} params
  * @returns {Promise<import("@cca/contracts").SearchProductsResponse>}
  */
@@ -49,7 +53,6 @@ export async function searchProducts(merchant_id, params = {}) {
   const ctx = {
     category: f.category ?? null,
     max_price: rawMax === undefined || rawMax === null ? null : Number(rawMax),
-    // Out-of-stock products are hidden unless the caller explicitly asks.
     available_only: f.available_only === undefined ? true : Boolean(f.available_only),
     attrs,
   };
@@ -61,14 +64,14 @@ export async function searchProducts(merchant_id, params = {}) {
   if (query && candidates.length) {
     await backfillEmbeddings(merchant_id); // lazy: ensure embeddings exist
     const vectors = new Map(
-      (await getEmbeddingRows(merchant_id)).map((r) => [r.product_id, r.vector]),
+      (await getEmbeddingRows(merchant_id)).map((r) => [`${r.merchant_id} ${r.product_id}`, r.vector]),
     );
     const embedder = await getEmbedder();
     const [queryVec] = await embedder.embed([query]);
 
     results = candidates
       .map((p) => {
-        const v = vectors.get(p.product_id);
+        const v = vectors.get(vecKey(p));
         return { ...p, score: v ? Number(cosine(queryVec, v).toFixed(4)) : 0 };
       })
       .sort((a, b) => b.score - a.score);

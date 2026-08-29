@@ -1,0 +1,9 @@
+product_id,merchant_id,name,description,price,currency,category,image_url,size,color,availability
+np_001,merchant_nimbus,Nimbus Glide 12,"Cushioned everyday road running shoe with a breathable knit upper.",135.00,USD,fashion,https://picsum.photos/seed/np_001/400/300,7|8|9|10|11|12,slate|coral|white,true
+np_002,merchant_nimbus,Nimbus Rocket Carbon,"Carbon-plated racing shoe at 6.1 oz for personal-best days.",220.00,USD,fashion,https://picsum.photos/seed/np_002/400/300,8|9|10|11,volt|black,true
+np_003,merchant_nimbus,Nimbus Trail Grip,"Lugged trail runner with a rock plate and toe bumper.",145.00,USD,fashion,https://picsum.photos/seed/np_003/400/300,8|9|10|11|12,moss|clay,true
+np_004,merchant_nimbus,Nimbus Cloud Walker,"Slip-resistant walking shoe with a memory-foam footbed.",110.00,USD,fashion,https://picsum.photos/seed/np_004/400/300,7|8|9|10|11|12,grey|navy|white,true
+np_005,merchant_nimbus,Nimbus Recovery Slide,"Ultra-soft post-run slide with a contoured EVA footbed.",45.00,USD,fashion,https://picsum.photos/seed/np_005/400/300,7|8|9|10|11|12,black|sky,true
+np_006,merchant_nimbus,Nimbus Grip Socks (3-pack),"Low-cut cushioned running socks with arch support.",18.00,USD,fashion,https://picsum.photos/seed/np_006/400/300,M|L,white|black,true
+np_007,merchant_nimbus,Nimbus Alpine Boot,"Insulated, waterproof winter running boot with a gaiter collar.",168.00,USD,fashion,https://picsum.photos/seed/np_007/400/300,8|9|10|11|12,charcoal,false
+np_008,merchant_nimbus,Nimbus Weekender Trainer,"Retro-styled everyday trainer in suede and mesh.",92.00,USD,fashion,https://picsum.photos/seed/np_008/400/300,7|8|9|10|11|12,sand|forest|burgundy,true

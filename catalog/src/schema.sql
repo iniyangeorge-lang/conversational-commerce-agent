@@ -11,6 +11,15 @@ CREATE TABLE IF NOT EXISTS merchants (
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Dashboard logins. One or more users per merchant (Phase: merchant auth).
+CREATE TABLE IF NOT EXISTS merchant_users (
+  id            TEXT PRIMARY KEY,
+  merchant_id   TEXT NOT NULL REFERENCES merchants(merchant_id) ON DELETE CASCADE,
+  email         TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS products (
   merchant_id  TEXT NOT NULL REFERENCES merchants(merchant_id),
   -- product_id is unique WITHIN a merchant, not globally - two merchants may
