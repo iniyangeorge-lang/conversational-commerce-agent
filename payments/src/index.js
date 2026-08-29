@@ -1,13 +1,44 @@
-// Phase 1 - Mock Visa payment service.
-// Placeholder entrypoint created in Phase 0 scaffolding.
-//
-// Endpoints to implement:
-//   POST /mock-visa/tokenize            -> { payment_token, card_last4, created_at }
-//   POST /mock-visa/charge              -> approved | declined  (idempotent on order_ref)
-//   GET  /mock-visa/transactions/:merchant_id
-//
-// Demo decline rule: amount ending in .13 -> declined (insufficient_funds).
+// Phase 1 - Mock Visa payment service entrypoint.
 
-const PORT = process.env.PAYMENTS_PORT ?? 4001;
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createApp } from "./app.js";
+import { migrate, pool } from "./db.js";
 
-console.log(`[payments] scaffold only - implement in Phase 1. Would listen on :${PORT}`);
+// Load .env from the repo root (npm runs workspace scripts with cwd = package
+// dir, so cwd/.env would miss it). Missing file is fine - defaults cover local dev.
+const here = path.dirname(fileURLToPath(import.meta.url));
+for (const candidate of [
+  path.resolve(here, "../../.env"),
+  path.resolve(process.cwd(), ".env"),
+]) {
+  try {
+    process.loadEnvFile(candidate);
+    break;
+  } catch {
+    /* no file here - try the next */
+  }
+}
+
+const PORT = Number(process.env.PAYMENTS_PORT ?? 4001);
+
+migrate()
+  .then(() => {
+    const server = createApp().listen(PORT, () => {
+      console.log(`[payments] mock Visa service listening on :${PORT}`);
+    });
+
+    const shutdown = (signal) => {
+      console.log(`[payments] ${signal} received - shutting down`);
+      server.close(async () => {
+        await pool.end();
+        process.exit(0);
+      });
+    };
+    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+  })
+  .catch((err) => {
+    console.error("[payments] failed to start:", err.message);
+    process.exit(1);
+  });

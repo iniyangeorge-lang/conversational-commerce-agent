@@ -6,10 +6,15 @@
   "description": "Mock Visa payment service (Phase 1): tokenize + charge/decline + transactions.",
   "scripts": {
     "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "migrate": "node src/migrate.js",
+    "test": "node --test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@cca/contracts": "*"
+    "@cca/contracts": "*",
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "typescript": "^5.5.0"
