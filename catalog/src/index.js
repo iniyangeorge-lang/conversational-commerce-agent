@@ -1,9 +1,44 @@
-// Phases 2-3 - Merchant onboarding, normalized catalog, search.
-// Placeholder entrypoint created in Phase 0 scaffolding.
-//
-// Phase 2: CSV upload, extract-from-text (LLM), category templates, products table.
-// Phase 3: embeddings + search_products(query, max_price, filters) -> top 5 ranked.
+// Phase 2-3 - Catalog service entrypoint.
 
-const PORT = process.env.CATALOG_PORT ?? 4002;
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createApp } from "./app.js";
+import { migrate, pool } from "./db.js";
 
-console.log(`[catalog] scaffold only - implement in Phases 2-3. Would listen on :${PORT}`);
+const here = path.dirname(fileURLToPath(import.meta.url));
+for (const candidate of [
+  path.resolve(here, "../../.env"),
+  path.resolve(process.cwd(), ".env"),
+]) {
+  try {
+    process.loadEnvFile(candidate);
+    break;
+  } catch {
+    /* no file here - try the next */
+  }
+}
+
+const PORT = Number(process.env.CATALOG_PORT ?? 4002);
+
+migrate()
+  .then(() => {
+    const server = createApp().listen(PORT, () => {
+      console.log(`[catalog] service listening on :${PORT}`);
+      if (!process.env.ANTHROPIC_API_KEY)
+        console.warn("[catalog] ANTHROPIC_API_KEY not set - the extract-from-text path will fail until it is");
+    });
+
+    const shutdown = (signal) => {
+      console.log(`[catalog] ${signal} received - shutting down`);
+      server.close(async () => {
+        await pool.end();
+        process.exit(0);
+      });
+    };
+    process.on("SIGINT", () => shutdown("SIGINT"));
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+  })
+  .catch((err) => {
+    console.error("[catalog] failed to start:", err.message);
+    process.exit(1);
+  });
