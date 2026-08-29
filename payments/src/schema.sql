@@ -2,11 +2,15 @@
 -- Idempotent: safe to run on every boot.
 
 CREATE TABLE IF NOT EXISTS payment_tokens (
-  token       TEXT PRIMARY KEY,
-  user_ref    TEXT NOT NULL,
-  card_last4  TEXT NOT NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  token          TEXT PRIMARY KEY,
+  user_ref       TEXT NOT NULL,
+  card_last4     TEXT NOT NULL,
+  -- Non-null for a known bad test card: charges on this token decline with this
+  -- reason. Decided at tokenization from the card number, then carried here.
+  decline_reason TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE payment_tokens ADD COLUMN IF NOT EXISTS decline_reason TEXT;
 
 CREATE TABLE IF NOT EXISTS transactions (
   id             TEXT PRIMARY KEY,

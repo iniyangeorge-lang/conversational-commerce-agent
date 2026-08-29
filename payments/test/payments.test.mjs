@@ -1,5 +1,5 @@
-// Phase 1 DoD: tokenize -> charge -> row in transactions, and the .13 decline
-// path works reliably. Needs Postgres up (docker compose up -d).
+// Phase 1 DoD: tokenize -> charge -> row in transactions, and the decline
+// test cards work reliably. Needs Postgres up (docker compose up -d).
 
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
@@ -77,31 +77,34 @@ test("tokenize -> charge (approved) -> shows up in the merchant's transactions",
   assert.equal(list.transactions[0].decline_reason, null);
 });
 
-test("amount ending in .13 is declined with insufficient_funds", async () => {
-  const merchant_id = newMerchant();
-  const { payment_token } = await tokenize();
-
-  for (const amount of [89.13, 0.13, 150.13]) {
-    const body = await post("/mock-visa/charge", {
-      payment_token,
-      amount,
-      currency: "USD",
-      merchant_id,
-      order_ref: `ord_${amount}`,
-    }).then((r) => r.json());
-    assert.equal(body.status, "declined", `amount ${amount}`);
-    assert.equal(body.decline_reason, "insufficient_funds");
-    assert.ok(!("auth_code" in body));
+test("decline test cards decline with the mapped reason; other cards approve", async () => {
+  const cases = [
+    ["4000000000000002", "card_declined"],
+    ["4000000000009995", "insufficient_funds"],
+    ["4000000000000069", "expired_card"],
+    ["4000000000000119", "suspected_fraud"],
+  ];
+  for (const [card_number, reason] of cases) {
+    const merchant_id = newMerchant();
+    const { payment_token } = await post("/mock-visa/tokenize", { card_number, user_ref: "u" }).then((r) => r.json());
+    for (const amount of [10, 89.13, 150]) {
+      const body = await post("/mock-visa/charge", {
+        payment_token, amount, currency: "USD", merchant_id, order_ref: `ord_${amount}`,
+      }).then((r) => r.json());
+      assert.equal(body.status, "declined", `${card_number} @ ${amount}`);
+      assert.equal(body.decline_reason, reason);
+      assert.ok(!("auth_code" in body));
+    }
   }
 
-  const nonDecline = await post("/mock-visa/charge", {
-    payment_token,
-    amount: 89.14,
-    currency: "USD",
-    merchant_id,
-    order_ref: "ord_ok",
-  }).then((r) => r.json());
-  assert.equal(nonDecline.status, "approved");
+  const merchant_id = newMerchant();
+  const { payment_token } = await tokenize(); // 4111 1111 1111 1111
+  for (const amount of [0.13, 89.13, 150.13, 42]) {
+    const body = await post("/mock-visa/charge", {
+      payment_token, amount, currency: "USD", merchant_id, order_ref: `ok_${amount}`,
+    }).then((r) => r.json());
+    assert.equal(body.status, "approved", `good card @ ${amount}`);
+  }
 });
 
 test("repeat order_ref returns the original transaction, never double-charges", async () => {

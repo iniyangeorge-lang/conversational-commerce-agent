@@ -11,7 +11,7 @@
 
 import { randomBytes } from "node:crypto";
 import express from "express";
-import { isDemoDecline, roundMoney } from "./rules.js";
+import { classifyCard, roundMoney } from "./rules.js";
 import { query } from "./db.js";
 
 const rand = (n) => randomBytes(n).toString("hex");
@@ -103,10 +103,10 @@ export function createApp() {
       const card_last4 = digits.slice(-4);
       const token = newPaymentToken();
       const { rows } = await query(
-        `INSERT INTO payment_tokens (token, user_ref, card_last4)
-         VALUES ($1, $2, $3)
+        `INSERT INTO payment_tokens (token, user_ref, card_last4, decline_reason)
+         VALUES ($1, $2, $3, $4)
          RETURNING created_at`,
-        [token, body.user_ref, card_last4],
+        [token, body.user_ref, card_last4, classifyCard(digits)],
       );
 
       return res.status(201).json({
@@ -129,9 +129,10 @@ export function createApp() {
 
       const { payment_token, amount, currency, merchant_id, order_ref } = body;
 
-      const tok = await query(`SELECT token FROM payment_tokens WHERE token = $1`, [
-        payment_token,
-      ]);
+      const tok = await query(
+        `SELECT token, decline_reason FROM payment_tokens WHERE token = $1`,
+        [payment_token],
+      );
       if (tok.rowCount === 0)
         return fail(res, 422, "unknown_token", "payment_token is not recognised");
 
@@ -144,12 +145,13 @@ export function createApp() {
         return res.status(200).json(toChargeResponse(existing.rows[0]));
 
       const rounded = roundMoney(amount);
-      const declined = isDemoDecline(rounded);
+      // Decline behaviour is a property of the card, set at tokenization.
+      const declineReason = tok.rows[0].decline_reason;
       const draft = {
         id: newTransactionId(),
-        status: declined ? "declined" : "approved",
-        auth_code: declined ? null : "00",
-        decline_reason: declined ? "insufficient_funds" : null,
+        status: declineReason ? "declined" : "approved",
+        auth_code: declineReason ? null : "00",
+        decline_reason: declineReason ?? null,
       };
 
       try {

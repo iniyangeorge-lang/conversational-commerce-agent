@@ -28,7 +28,14 @@ Contract shapes: `@cca/contracts` -> `src/payments.ts`.
 
 ## Behaviour
 
-- **Demo decline:** any `amount` ending in `.13` -> `{ status: "declined", decline_reason: "insufficient_funds" }`. Reliable, repeatable failure path for the live demo.
+- **Decline test cards:** decline behaviour is a property of the card, set at tokenization and carried on the token. Charging a token minted from one of these declines with the mapped reason; any other 12-19 digit card approves:
+
+  | Card number | `decline_reason` |
+  |---|---|
+  | `4000 0000 0000 0002` | `card_declined` |
+  | `4000 0000 0000 9995` | `insufficient_funds` |
+  | `4000 0000 0000 0069` | `expired_card` |
+  | `4000 0000 0000 0119` | `suspected_fraud` |
 - **Idempotency:** a repeat `charge` with an existing `(merchant_id, order_ref)` returns the *original* transaction and does not charge again - including under a concurrent race (unique constraint + `23505` catch).
 - **A decline is a 200.** Non-2xx is only for real errors, using the `ErrorResponse` shape (`{ error: { code, message, details? } }`):
   - `422 invalid_request` - charge body failed validation (`details` lists each bad field)
@@ -40,7 +47,7 @@ Contract shapes: `@cca/contracts` -> `src/payments.ts`.
 ## Data model
 
 ```
-payment_tokens(token PK, user_ref, card_last4, created_at)
+payment_tokens(token PK, user_ref, card_last4, decline_reason, created_at)
 transactions(id PK, token -> payment_tokens, merchant_id, amount NUMERIC(12,2),
              currency, status, auth_code, decline_reason, order_ref, created_at,
              UNIQUE(merchant_id, order_ref))
@@ -55,6 +62,6 @@ Schema lives in `src/schema.sql` and is applied on every boot (`CREATE TABLE IF 
 | `src/index.js` | entrypoint: load env -> migrate -> listen, graceful shutdown |
 | `src/app.js` | Express app + routes (exported for tests) |
 | `src/db.js` | pg pool, `migrate()`, NUMERIC->number parser |
-| `src/rules.js` | `isDemoDecline`, `roundMoney` (the `.13` rule) |
+| `src/rules.js` | `classifyCard` (decline test cards), `roundMoney` |
 | `src/schema.sql` | table definitions |
 | `test/payments.test.mjs` | Phase 1 DoD as `node --test` cases |

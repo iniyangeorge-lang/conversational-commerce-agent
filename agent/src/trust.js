@@ -259,6 +259,11 @@ export class TrustLayer {
       session.total_spent = roundMoney(spent + preview.total);
       session.state = "paid";
       status = "approved";
+      // Order placed - empty the cart so the shopper can start a new one.
+      // (A declined charge keeps the cart so they can retry with another card.)
+      session.cart.items = [];
+      session.cart.subtotal = 0;
+      session.checkout_preview = null;
     } else {
       result = { outcome: "declined", transaction_id: charge.transaction_id, decline_reason: charge.decline_reason };
       session.state = "declined";

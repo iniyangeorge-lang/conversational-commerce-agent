@@ -6,15 +6,13 @@
   <title>Sole &amp; Stride — demo storefront</title>
   <style>
     body { margin: 0; font: 15px/1.5 system-ui, sans-serif; color: #1b2438; background: #eef1f6; }
-    .page { max-width: 900px; margin: 0 auto; padding: 32px 20px 64px; }
+    .page { max-width: 1040px; margin: 0 auto; padding: 32px 20px 64px; }
     header h1 { margin: 0 0 4px; }
-    header p { margin: 0 0 28px; color: #5a6478; }
-    .layout { display: grid; gap: 28px; grid-template-columns: 1fr; }
-    @media (min-width: 760px) { .layout { grid-template-columns: 1fr auto; align-items: start; } }
-    .copy { background: #fff; border: 1px solid #dfe3ec; border-radius: 14px; padding: 20px 22px; }
+    header p { margin: 0 0 24px; color: #5a6478; }
+    .copy { background: #fff; border: 1px solid #dfe3ec; border-radius: 14px; padding: 18px 22px; margin-bottom: 24px; }
     .copy h2 { margin-top: 0; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; color: #6b7590; }
     code { background: #f0f2f7; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
-    ol { padding-left: 20px; } li { margin: 6px 0; }
+    ol { padding-left: 20px; margin: 0; } li { margin: 6px 0; }
   </style>
 </head>
 <body>
@@ -24,23 +22,21 @@
       <p>Chat-native storefront demo — discover, decide, and pay in one thread.</p>
     </header>
 
-    <div class="layout">
-      <div class="copy">
-        <h2>Try it</h2>
-        <ol>
-          <li>Type <code>waterproof boots for winter under $150</code></li>
-          <li>Click <b>Add to cart</b> on a result</li>
-          <li>Say <code>I'm ready to check out</code></li>
-          <li>On the checkout card: enter any 16-digit number (e.g. <code>4242 4242 4242 4242</code>), verification code <code>1234</code> if asked, then <b>Confirm &amp; pay</b></li>
-        </ol>
-        <p style="color:#6b7590">Decline path: build a cart whose <b>total</b> ends in <code>.13</code>.</p>
-      </div>
-
-      <!-- The widget injects itself immediately after this script tag. -->
-      <script src="./widget.js"
-              data-merchant="merchant_123"
-              data-agent-url="http://localhost:4003"></script>
+    <div class="copy">
+      <h2>Try it</h2>
+      <ol>
+        <li>Type <code>waterproof boots for winter under $150</code></li>
+        <li>Pick a size on a product card, then <b>Add to cart</b> — the bag on the right updates</li>
+        <li>Click <b>Checkout</b> in the bag (or say <code>I'm ready to check out</code>)</li>
+        <li>On the checkout card: any 16-digit number (e.g. <code>4242 4242 4242 4242</code>), code <code>1234</code> if asked, then <b>Confirm &amp; pay</b></li>
+      </ol>
+      <p style="color:#6b7590">Decline path: pay with card <code>4000 0000 0000 0002</code>.</p>
     </div>
+
+    <!-- The widget injects itself immediately after this script tag. -->
+    <script src="./widget.js"
+            data-merchant="merchant_123"
+            data-agent-url="http://localhost:4003"></script>
   </div>
 </body>
 </html>

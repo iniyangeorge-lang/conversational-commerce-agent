@@ -34,7 +34,7 @@ Requires Node 20+ and Docker. Nothing is committed to `.env`.
 | Folder | Package | Phase | Responsibility |
 |---|---|---|---|
 | `contracts/` | `@cca/contracts` | 0 | **Shared types + JSON schemas.** Single source of truth for every inter-service contract. |
-| `payments/` | `@cca/payments` | 1 | Mock Visa service: tokenize + charge/decline + transactions. `.13` demo decline. Idempotent on `order_ref`. |
+| `payments/` | `@cca/payments` | 1 | Mock Visa service: tokenize + charge/decline + transactions. Decline test cards. Idempotent on `order_ref`. |
 | `catalog/` | `@cca/catalog` | 2–3 | Merchant onboarding (CSV + extract-from-text), normalized catalog, `search_products`. |
 | `agent/` | `@cca/agent` | 4 (+5) | Conversational agent (function-calling), state machine, and the trust & consent code path (`POST /checkout/confirm`). |
 | `frontend/` | `@cca/frontend` | 6 | Chat widget: one thread, inline product + transaction-preview cards. |

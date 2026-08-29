@@ -2,7 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { CommerceAgent, MemoryStore } from "../src/agent.js";
 import { createApp } from "../src/app.js";
+import { sessionKey } from "../src/state.js";
 import { MemoryAuditRepository, TrustLayer } from "../src/trust.js";
+
+const loadSession = async (store, sessionId) => JSON.parse(await store.get(sessionKey(sessionId)));
 
 const merchant = {
   merchant_id: "merchant_test",
@@ -16,8 +19,9 @@ const merchant = {
 const products = [
   { product_id: "cheap", merchant_id: merchant.merchant_id, name: "Everyday Shoe", description: "A comfortable shoe", price: 40, currency: "USD", category: "fashion", image_url: "https://example.com/cheap", attributes: { size: ["9"], color: ["black"] }, availability: true },
   { product_id: "premium", merchant_id: merchant.merchant_id, name: "Premium Boot", description: "A premium boot", price: 120, currency: "USD", category: "fashion", image_url: "https://example.com/premium", attributes: { size: ["9"], color: ["black"] }, availability: true },
-  { product_id: "decline", merchant_id: merchant.merchant_id, name: "Demo Decline Shoe", description: "A demo shoe", price: 82.34, currency: "USD", category: "fashion", image_url: "https://example.com/decline", attributes: { size: ["9"], color: ["black"] }, availability: true },
 ];
+
+const DECLINE_CARD = "4000000000000002";
 
 function fakeCatalog() {
   return {
@@ -33,13 +37,18 @@ function fakeCatalog() {
 
 function fakePayments() {
   const charges = [];
+  const badTokens = new Set();
   return {
     charges,
-    async tokenize() { return { payment_token: "vtk_test", card_last4: "4242" }; },
+    async tokenize({ card_number }) {
+      const token = `vtk_${String(card_number).replace(/\D/g, "").slice(-8)}`;
+      if (card_number === DECLINE_CARD) badTokens.add(token);
+      return { payment_token: token, card_last4: String(card_number).slice(-4) };
+    },
     async charge(request) {
       charges.push(request);
-      if (Math.round(request.amount * 100) % 100 === 13)
-        return { status: "declined", transaction_id: `txn_${charges.length}`, decline_reason: "insufficient_funds" };
+      if (badTokens.has(request.payment_token))
+        return { status: "declined", transaction_id: `txn_${charges.length}`, decline_reason: "card_declined" };
       return { status: "approved", transaction_id: `txn_${charges.length}`, auth_code: "00" };
     },
   };
@@ -59,8 +68,8 @@ async function prepared(productId, quantity = 1) {
   return { agent, store, catalog, trust, payments, audit, session_id: `s_${productId}_${quantity}`, cart_id: checkout.messages.find((m) => m.type === "transaction_preview").preview.cart_id };
 }
 
-async function addPayment(preparedCheckout) {
-  await preparedCheckout.trust.tokenizePaymentMethod({ session_id: preparedCheckout.session_id, card_number: "4242424242424242" });
+async function addPayment(preparedCheckout, card_number = "4242424242424242") {
+  await preparedCheckout.trust.tokenizePaymentMethod({ session_id: preparedCheckout.session_id, card_number });
 }
 
 test("confirm recomputes the total, charges only after tokenization, and is idempotent", async () => {
@@ -75,6 +84,11 @@ test("confirm recomputes the total, charges only after tokenization, and is idem
   assert.deepEqual(replay.result, approved.result);
   assert.equal(c.payments.charges.length, 1);
   assert.equal((await c.audit.list(c.session_id)).length, 3);
+
+  const session = await loadSession(c.store, c.session_id);
+  assert.equal(session.state, "paid");
+  assert.equal(session.cart.items.length, 0);
+  assert.equal(session.cart.subtotal, 0);
 });
 
 test("step-up is required above the merchant threshold and accepts the mock code", async () => {
@@ -97,13 +111,15 @@ test("large carts are not capped (spend cap removed)", async () => {
   assert.equal(c.payments.charges.length, 1);
 });
 
-test("the .13 payment decline is surfaced and audited", async () => {
-  const c = await prepared("decline");
-  await addPayment(c);
+test("a decline test card is surfaced and audited; cart is kept for a retry", async () => {
+  const c = await prepared("cheap");
+  await addPayment(c, DECLINE_CARD);
   const result = await c.trust.confirm({ session_id: c.session_id, cart_id: c.cart_id });
   assert.equal(result.result.outcome, "declined");
-  assert.equal(result.result.decline_reason, "insufficient_funds");
+  assert.equal(result.result.decline_reason, "card_declined");
   assert.equal((await c.audit.list(c.session_id)).at(-1).resulting_status, "declined");
+  // a declined charge keeps the cart so the shopper can retry with another card
+  assert.equal((await loadSession(c.store, c.session_id)).cart.items.length, 1);
 });
 
 test("cart price changes after preview are blocked", async () => {

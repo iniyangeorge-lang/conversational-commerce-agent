@@ -77,7 +77,13 @@ export interface TransactionsListResponse {
 }
 
 /**
- * Demo decline rule: any charge whose `amount` ends in `.13` is declined
- * with `insufficient_funds`. Gives a reliable, repeatable failure path.
+ * Decline behaviour is keyed to the card number, like a real gateway's test
+ * PANs. A charge on a token minted from one of these declines with the mapped
+ * reason; any other 12-19 digit card approves.
  */
-export const DEMO_DECLINE_CENTS = 13;
+export const DECLINE_TEST_CARDS: Record<string, DeclineReason> = {
+  "4000000000000002": "card_declined",
+  "4000000000009995": "insufficient_funds",
+  "4000000000000069": "expired_card",
+  "4000000000000119": "suspected_fraud",
+};

@@ -1,19 +1,22 @@
 // Payment simulation rules.
 //
-// DEMO_DECLINE_CENTS mirrors `@cca/contracts` (contracts/src/payments.ts). It is
-// re-declared here on purpose: this service is meant to be standalone, so it
-// carries its own copy of the one rule that matters rather than importing it.
+// Decline behaviour is keyed to the card number (like a real gateway's test
+// PANs), decided at tokenization and carried on the token. Everything else
+// approves. Kept inline so this service stays standalone.
 
-export const DEMO_DECLINE_CENTS = 13;
+/** Test PAN -> decline reason. Any other 12-19 digit number approves. */
+export const DECLINE_TEST_CARDS = {
+  "4000000000000002": "card_declined",
+  "4000000000009995": "insufficient_funds",
+  "4000000000000069": "expired_card",
+  "4000000000000119": "suspected_fraud",
+};
+
+/** @returns {string|null} a decline reason for a known bad test card, else null. */
+export function classifyCard(cardNumber) {
+  const digits = String(cardNumber ?? "").replace(/\D/g, "");
+  return DECLINE_TEST_CARDS[digits] ?? null;
+}
 
 /** Round a computed amount to whole cents. */
 export const roundMoney = (amount) => Math.round(amount * 100) / 100;
-
-/**
- * Demo decline rule: any charge whose amount ends in `.13` is declined. Gives a
- * reliable, repeatable way to trigger the failure path during a live demo.
- */
-export function isDemoDecline(amount) {
-  const cents = Math.round(roundMoney(amount) * 100) % 100;
-  return cents === DEMO_DECLINE_CENTS;
-}
